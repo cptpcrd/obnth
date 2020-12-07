@@ -4,7 +4,6 @@ use obnth::{Dir, FileType, LookupFlags};
 
 #[test]
 fn test_file_types_char() {
-    check_file_type(Path::new("/dev/tty"), FileType::Character);
     check_file_type(Path::new("/dev/null"), FileType::Character);
     check_file_type(Path::new("/dev/zero"), FileType::Character);
 }
