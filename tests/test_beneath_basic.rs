@@ -34,7 +34,9 @@ fn test_open_beneath_success() {
             LookupFlags::empty(),
             "a",
         ),
+        #[cfg(target_os = "linux")]
         ("a", libc::O_PATH, LookupFlags::empty(), "a"),
+        #[cfg(target_os = "linux")]
         (
             "a",
             libc::O_PATH | libc::O_NOFOLLOW,
@@ -49,7 +51,9 @@ fn test_open_beneath_success() {
         ("e", libc::O_RDONLY, LookupFlags::IN_ROOT, "a"),
         ("a/b", libc::O_WRONLY, LookupFlags::empty(), "a/b"),
         ("c", libc::O_WRONLY, LookupFlags::empty(), "a/b"),
+        #[cfg(target_os = "linux")]
         ("c", libc::O_PATH, LookupFlags::empty(), "a/b"),
+        #[cfg(target_os = "linux")]
         (
             "c",
             libc::O_PATH | libc::O_NOFOLLOW,
