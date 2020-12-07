@@ -6,7 +6,7 @@ use std::os::unix::prelude::*;
 use obnth::{Dir, FileType, LookupFlags, Metadata};
 
 pub fn same_meta(m1: &Metadata, m2: &fs::Metadata) -> bool {
-    m1.stat().st_dev == m2.dev() && m1.stat().st_ino == m2.ino()
+    m1.stat().st_dev as u64 == m2.dev() && m1.stat().st_ino as u64 == m2.ino()
 }
 
 #[test]
