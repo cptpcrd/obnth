@@ -31,7 +31,7 @@ fn test_recover_path_remove() {
 #[test]
 fn test_recover_path_rename() {
     let tmpdir = tempfile::tempdir().unwrap();
-    let tmpdir_path = tmpdir.as_ref();
+    let tmpdir_path = tmpdir.as_ref().canonicalize().unwrap();
 
     fs::create_dir(tmpdir_path.join("a")).unwrap();
     let tmpdir_a = Dir::open(tmpdir_path.join("a")).unwrap();
