@@ -35,15 +35,11 @@ impl Dir {
 
     #[inline]
     fn reopen_raw(&self, flags: libc::c_int) -> io::Result<RawFd> {
-        if flags == constants::DIR_OPEN_FLAGS {
-            util::dup(self.fd)
-        } else {
-            util::openat_raw(
-                self.fd,
-                unsafe { CStr::from_bytes_with_nul_unchecked(b".\0") },
-                flags,
-                0,
-            )
+        util::openat_raw(
+            self.fd,
+            unsafe { CStr::from_bytes_with_nul_unchecked(b".\0") },
+            flags,
+            0,
         }
     }
 
