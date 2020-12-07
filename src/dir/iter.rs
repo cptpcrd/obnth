@@ -161,8 +161,7 @@ impl Entry {
 
     /// Get the entry's file type, if available.
     ///
-    /// If this returns `None`, the OS either didn't specify a file type or specfied one that
-    /// wasn't recognized. This will never return `FileType::Other`.
+    /// If this returns `None`, the OS didn't specify a file type.
     #[inline]
     pub fn file_type(&self) -> Option<FileType> {
         self.ftype

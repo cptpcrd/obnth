@@ -12,8 +12,6 @@ pub enum FileType {
     Block,
     Character,
     Fifo,
-    /// Unrecognized file type (extremely rare!)
-    Other,
 }
 
 pub struct Metadata {
@@ -39,7 +37,7 @@ impl Metadata {
             libc::S_IFBLK => FileType::Block,
             libc::S_IFCHR => FileType::Character,
             libc::S_IFIFO => FileType::Fifo,
-            _ => FileType::Other,
+            _ => unreachable!(),
         }
     }
 
