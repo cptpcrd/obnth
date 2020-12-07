@@ -1,0 +1,19 @@
+[package]
+name = "obnth"
+version = "0.1.0"
+edition = "2018"
+
+authors = ["cptpcrd"]
+license = "MIT"
+
+[features]
+default = ["openat2"]
+
+openat2 = []
+
+[dependencies]
+libc = { version = "0.2", features = ["extra_traits"] }
+bitflags = "1.2"
+
+[dev-dependencies]
+tempfile = "3.1"

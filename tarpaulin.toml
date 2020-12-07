@@ -1,0 +1,7 @@
+[no_openat2_coverage]
+no-default-features = true
+
+[openat2_coverage]
+
+[report]
+out = ["Html"]
