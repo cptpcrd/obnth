@@ -14,6 +14,7 @@ pub enum FileType {
     Fifo,
 }
 
+/// Represents metadata information about a file. Similar to `std::fs::Metadata`.
 pub struct Metadata {
     stat: libc::stat,
 }

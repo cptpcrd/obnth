@@ -99,7 +99,7 @@ impl<'a> OpenOptions<'a> {
         self
     }
 
-    /// Pass cusstom flags when opening the file.
+    /// Pass custom flags when opening the file.
     ///
     /// Like `std::fs::OpenOptions`, `O_ACCMODE` is masked out from the given flags.
     #[inline]

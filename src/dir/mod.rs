@@ -19,12 +19,14 @@ fn cstr(s: &OsStr) -> io::Result<CString> {
     Ok(CString::new(s.as_bytes())?)
 }
 
+/// A wrapper around a directory file descriptor that allows opening files within that directory.
 #[derive(Debug)]
 pub struct Dir {
     fd: RawFd,
 }
 
 impl Dir {
+    /// Open the specified directory.
     pub fn open<P: AsPath>(path: P) -> io::Result<Self> {
         path.with_cstr(|s| {
             Ok(Self {
@@ -68,6 +70,10 @@ impl Dir {
         }
     }
 
+    /// Open a subdirectory of this directory.
+    ///
+    /// `path` or one of its components can refer to a symlink (unless `LookupFlags::NO_SYMLINKS`
+    /// is passed), but the specified subdirectory must be contained within this directory.
     pub fn sub_dir<P: AsPath>(&self, path: P, lookup_flags: LookupFlags) -> io::Result<Self> {
         Ok(Self {
             fd: open_beneath(self.fd, path, constants::DIR_OPEN_FLAGS, 0, lookup_flags)?
@@ -75,6 +81,7 @@ impl Dir {
         })
     }
 
+    /// Create a directory within this directory.
     pub fn create_dir<P: AsPath>(
         &self,
         path: P,
@@ -92,6 +99,7 @@ impl Dir {
         }
     }
 
+    /// Remove a subdirectory of this directory.
     pub fn remove_dir<P: AsPath>(&self, path: P, lookup_flags: LookupFlags) -> io::Result<()> {
         let (subdir, fname) = prepare_inner_operation(self, path.as_path(), lookup_flags)?;
 
@@ -119,6 +127,7 @@ impl Dir {
         }
     }
 
+    /// Remove a file within this directory.
     pub fn remove_file<P: AsPath>(&self, path: P, lookup_flags: LookupFlags) -> io::Result<()> {
         let (subdir, fname) = prepare_inner_operation(self, path.as_path(), lookup_flags)?;
 
@@ -131,6 +140,11 @@ impl Dir {
         }
     }
 
+    /// Create a symlink within this directory.
+    ///
+    /// `path` specifies the path where the symlink is created, and `target` specifies the file
+    /// that the symlink will point to. Note that the order is swapped compared to the C `symlink()`
+    /// function (and Rust's `std::os::unix::fs::symlink()`).
     pub fn symlink<P: AsPath, T: AsPath>(
         &self,
         path: P,
@@ -148,6 +162,7 @@ impl Dir {
         }
     }
 
+    /// Read the contents of the specified symlink.
     pub fn read_link<P: AsPath>(&self, path: P, lookup_flags: LookupFlags) -> io::Result<PathBuf> {
         // On Linux, we can actually get a file descriptor to the *symlink*, then readlink() that.
         // However, if we don't have openat2() then this costs an extra syscall, so let's only do
@@ -196,10 +211,12 @@ impl Dir {
         Ok(OsString::from_vec(target.into_bytes()).into())
     }
 
+    /// List the contents of this directory.
     pub fn list_self(&self) -> io::Result<ReadDirIter> {
         ReadDirIter::new_consume(self.reopen_raw(libc::O_DIRECTORY | libc::O_RDONLY)?)
     }
 
+    /// List the contents of the specified subdirectory.
     pub fn list_dir<P: AsPath>(
         &self,
         path: P,
@@ -217,16 +234,25 @@ impl Dir {
         )
     }
 
+    /// Try to "clone" this directory.
     pub fn try_clone(&self) -> io::Result<Self> {
         Ok(Self {
             fd: util::dup(self.fd)?,
         })
     }
 
+    /// Retrieve metadata of this directory.
+    ///
+    /// This is equivalent to `self.metadata(".", LookupFlags::empty())`, but it's significantly
+    /// more efficient.
     pub fn self_metadata(&self) -> io::Result<Metadata> {
         util::fstat(self.fd).map(Metadata::new)
     }
 
+    /// Retrieve information on the file with the given path.
+    ///
+    /// The specified file must be located within this directory. Symlinks in the final component
+    /// of the path are not followed.
     pub fn metadata<P: AsPath>(&self, path: P, lookup_flags: LookupFlags) -> io::Result<Metadata> {
         let (subdir, fname) = prepare_inner_operation(self, path.as_path(), lookup_flags)?;
 

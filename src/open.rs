@@ -9,6 +9,7 @@ use std::path::{Component, Path};
 use crate::{constants, sys, util, AsPath};
 
 bitflags::bitflags! {
+    /// Flags that modify path loookup when opening a file/directory beneath another directory.
     pub struct LookupFlags: u32 {
         /// Fail if any symlinks are encountered during path resolution.
         const NO_SYMLINKS = 0x01;
@@ -22,6 +23,13 @@ bitflags::bitflags! {
     }
 }
 
+/// Open a file beneath the specified directory.
+///
+/// This is equivalent to `libc::openat(dir_fd, path, flags, mode)` except that the resolved file
+/// is guaranteed to be within the directory referred to by `dir_fd` (and the `lookup_flags`
+/// argument can further alter behavior; see [`LookupFlags`] for more information).
+///
+/// [`LookupFlags`]: ./struct.LookupFlags.html
 pub fn open_beneath<P: AsPath>(
     dir_fd: RawFd,
     path: P,

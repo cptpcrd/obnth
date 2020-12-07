@@ -7,6 +7,7 @@ use crate::util;
 
 use super::FileType;
 
+/// An iterator over the entries of a directory.
 #[derive(Debug)]
 pub struct ReadDirIter {
     dir: NonNull<libc::DIR>,
@@ -93,6 +94,11 @@ impl Drop for ReadDirIter {
 }
 
 /// Represents a seek position for a `ReadDirIter` struct.
+///
+/// The actual raw offset is not exposed because it is an opaque value that must be obtained with
+/// [`tell()`].
+///
+/// [`tell()`]: ./struct.ReadDirIter.html#method.tell
 #[derive(Copy, Clone, Debug)]
 pub struct SeekPos(libc::c_long);
 
