@@ -42,7 +42,7 @@ pub fn samestat(st1: &libc::stat, st2: &libc::stat) -> bool {
 
 #[inline]
 pub fn dup(fd: RawFd) -> io::Result<RawFd> {
-    let new_fd = unsafe { libc::fcntl(fd, libc::F_DUPFD_CLOEXEC) };
+    let new_fd = unsafe { libc::fcntl(fd, libc::F_DUPFD_CLOEXEC, 0) };
 
     if new_fd < 0 {
         Err(io::Error::last_os_error())
