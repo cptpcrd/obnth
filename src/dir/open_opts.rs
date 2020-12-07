@@ -108,6 +108,17 @@ impl<'a> OpenOptions<'a> {
         self
     }
 
+    /// Set the "lookup flags" used when opening the file.
+    ///
+    /// See [`LookupFlags`] for more information. (By default, none of the "lookup flags" are
+    /// enabled.)
+    ///
+    /// [`LookupFlags`]: ./struct.LookupFlags.html
+    pub fn lookup_flags(&mut self, lookup_flags: LookupFlags) -> &mut Self {
+        self.lookup_flags = lookup_flags;
+        self
+    }
+
     fn flags(&self) -> io::Result<libc::c_int> {
         let mut flags = self.custom_flags & !libc::O_ACCMODE;
 
