@@ -40,7 +40,7 @@ impl Dir {
             unsafe { CStr::from_bytes_with_nul_unchecked(b".\0") },
             flags,
             0,
-        }
+        )
     }
 
     #[inline]
