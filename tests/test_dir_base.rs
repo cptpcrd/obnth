@@ -81,22 +81,42 @@ fn test_remove_file() {
 
     fs::File::create(&tmpdir_path.join("dir/subfile")).unwrap();
 
-    for (path, lookup_flags, eno) in [
-        (".", LookupFlags::empty(), libc::EISDIR),
-        ("/", LookupFlags::IN_ROOT, libc::EISDIR),
-        ("..", LookupFlags::IN_ROOT, libc::EISDIR),
-        ("dir", LookupFlags::empty(), libc::EISDIR),
-        ("dir/subfile/..", LookupFlags::empty(), libc::ENOTDIR),
+    for (path, lookup_flags, allow_enos) in [
+        (
+            ".",
+            LookupFlags::empty(),
+            [libc::EISDIR, libc::EPERM].as_ref(),
+        ),
+        (
+            "/",
+            LookupFlags::IN_ROOT,
+            [libc::EISDIR, libc::EPERM].as_ref(),
+        ),
+        (
+            "..",
+            LookupFlags::IN_ROOT,
+            [libc::EISDIR, libc::EPERM].as_ref(),
+        ),
+        (
+            "dir",
+            LookupFlags::empty(),
+            [libc::EISDIR, libc::EPERM].as_ref(),
+        ),
+        (
+            "dir/subfile/..",
+            LookupFlags::empty(),
+            [libc::ENOTDIR].as_ref(),
+        ),
     ]
     .iter()
     {
-        assert_eq!(
-            tmpdir
-                .remove_file(path, *lookup_flags)
-                .unwrap_err()
-                .raw_os_error(),
-            Some(*eno)
-        );
+        let eno = tmpdir
+            .remove_file(path, *lookup_flags)
+            .unwrap_err()
+            .raw_os_error()
+            .unwrap();
+
+        assert!(allow_enos.contains(&eno), "{}", eno);
     }
 
     tmpdir
