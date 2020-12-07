@@ -208,10 +208,14 @@ mod tests {
             Some(libc::EEXIST)
         );
 
-        assert_eq!(
-            unlinkat(tmpdir_fd, name, false).unwrap_err().raw_os_error(),
-            Some(libc::EISDIR)
-        );
+        // unlinkat() when specifying a directory but without the AT_REMOVEDIR flag can fail with
+        // either EISDIR or EPERM
+        let eno = unlinkat(tmpdir_fd, name, false)
+            .unwrap_err()
+            .raw_os_error()
+            .unwrap();
+        assert!([libc::EISDIR, libc::EPERM].contains(&eno), "{}", eno);
+
         unlinkat(tmpdir_fd, name, true).unwrap();
         assert_eq!(
             unlinkat(tmpdir_fd, name, true).unwrap_err().raw_os_error(),
