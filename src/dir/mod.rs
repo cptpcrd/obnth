@@ -269,9 +269,12 @@ impl Dir {
 
     /// Recover the path to the directory that this `Dir` is currently open to.
     ///
-    /// On Linux, this function looks at files in `/proc` as an optimization. However, if `/proc` is
-    /// not available, or on other platforms, it will fall back on a more reliable (but slower)
-    /// strategy.
+    /// OS-specific optimizations:
+    /// - On Linux, this will try `readlink("/proc/self/fd/$fd")`.
+    /// - On macOS, this will try `fcntl(fd, F_GETPATH)`.
+    ///
+    /// If either of these techniques fails (or on other platforms), it will fall back on a more
+    /// reliable (but slower) strategy.
     ///
     /// Some notes:
     /// - If the directory has been deleted, this function will fail with `ENOENT` (this is
