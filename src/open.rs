@@ -87,11 +87,6 @@ pub fn open_beneath<P: AsPath>(
     mode: libc::mode_t,
     lookup_flags: LookupFlags,
 ) -> io::Result<fs::File> {
-    if dir_fd == libc::AT_FDCWD {
-        // An actual directory must be specified
-        return Err(io::Error::from_raw_os_error(libc::EBADF));
-    }
-
     #[cfg(all(feature = "openat2", target_os = "linux"))]
     if let Some(file) =
         path.with_cstr(|s| open_beneath_openat2(dir_fd, s, flags, mode, lookup_flags))?
@@ -110,6 +105,11 @@ fn open_beneath_openat2(
     mode: libc::mode_t,
     lookup_flags: LookupFlags,
 ) -> io::Result<Option<fs::File>> {
+    if dir_fd == libc::AT_FDCWD {
+        // An actual directory must be specified
+        return Err(io::Error::from_raw_os_error(libc::EBADF));
+    }
+
     flags |= libc::O_NOCTTY;
 
     if flags & libc::O_PATH == libc::O_PATH {
@@ -283,9 +283,9 @@ fn do_open_beneath(
     mode: libc::mode_t,
     lookup_flags: LookupFlags,
 ) -> io::Result<fs::File> {
-    debug_assert_ne!(dir_fd, libc::AT_FDCWD);
-
     let dir_fd_stat = util::fstat(dir_fd)?;
+
+    debug_assert_ne!(dir_fd, libc::AT_FDCWD);
 
     if dir_fd_stat.st_mode & libc::S_IFDIR != libc::S_IFDIR {
         return Err(io::Error::from_raw_os_error(libc::ENOTDIR));
