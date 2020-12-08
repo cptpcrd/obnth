@@ -100,10 +100,17 @@ pub fn open_beneath<P: AsPath>(
 fn open_beneath_openat2(
     dir_fd: RawFd,
     path: &CStr,
-    flags: libc::c_int,
+    mut flags: libc::c_int,
     mode: libc::mode_t,
     lookup_flags: LookupFlags,
 ) -> io::Result<Option<fs::File>> {
+    if flags & libc::O_PATH == libc::O_PATH {
+        // If we have O_PATH, throw out everything except the O_PATH and the flags that work with
+        // it.
+        // O_CLOEXEC is missing from this list; we add it in below.
+        flags &= libc::O_PATH | libc::O_DIRECTORY | libc::O_NOFOLLOW;
+    }
+
     let mut how = sys::open_how {
         flags: (flags | libc::O_CLOEXEC) as u64,
         mode: 0,
