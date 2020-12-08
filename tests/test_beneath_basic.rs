@@ -185,3 +185,48 @@ fn test_open_beneath_error() {
         );
     }
 }
+
+#[test]
+fn test_open_beneath_execute() {
+    let tmpdir = tempfile::tempdir().unwrap();
+    let tmpdir = tmpdir.as_ref();
+
+    let tmpdir_file = fs::File::open(tmpdir).unwrap();
+    let tmpdir_fd = tmpdir_file.as_raw_fd();
+
+    fs::create_dir(tmpdir.join("a")).unwrap();
+    fs::File::create(tmpdir.join("a/b")).unwrap();
+
+    // 0o100 is "--x------"; i.e. execute permission but not read permission.
+    // That allows us to look at files within the directory, but not list the directory (or open it
+    // without O_PATH or O_SEARCH).
+    std::fs::set_permissions(tmpdir.join("a"), fs::Permissions::from_mode(0o100)).unwrap();
+
+    let res = std::panic::catch_unwind(|| {
+        if obnth::has_o_search() {
+            let file =
+                obnth::open_beneath(tmpdir_fd, "a/b", libc::O_RDONLY, 0, LookupFlags::empty())
+                    .unwrap();
+
+            assert!(same_file_meta(&file, &fs::metadata(tmpdir.join("a/b")).unwrap()).unwrap());
+        } else {
+            assert_eq!(
+                obnth::open_beneath(tmpdir_fd, "a/b", libc::O_RDONLY, 0, LookupFlags::empty())
+                    .unwrap_err()
+                    .raw_os_error(),
+                Some(libc::EACCES)
+            );
+        }
+
+        assert_eq!(
+            obnth::open_beneath(tmpdir_fd, "a", libc::O_RDONLY, 0, LookupFlags::empty())
+                .unwrap_err()
+                .raw_os_error(),
+            Some(libc::EACCES)
+        );
+    });
+
+    // So it can be deleted
+    std::fs::set_permissions(tmpdir.join("a"), fs::Permissions::from_mode(0o755)).unwrap();
+    res.unwrap();
+}
