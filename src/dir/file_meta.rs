@@ -27,8 +27,6 @@ impl Metadata {
     }
 
     /// Get the type of this file.
-    ///
-    /// Returns `FileType::Other` if the file type is not recognized (unlikely).
     pub fn file_type(&self) -> FileType {
         match self.stat.st_mode & libc::S_IFMT {
             libc::S_IFREG => FileType::File,
