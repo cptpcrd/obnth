@@ -29,6 +29,12 @@ bitflags::bitflags! {
 /// **Note**: This is an edge case; most users are unlikely to encounter cases where this is
 /// relevant. Keep reading if you want more information.
 ///
+/// # Platform support
+///
+/// Currently, this will only return `true` on the following platforms:
+/// - Linux/Android
+/// - FreeBSD
+///
 /// # Unix directory permissions background
 ///
 /// - **Read** permission (`r--`, bit 4 in numeric permissions) on a directory allows you to list
