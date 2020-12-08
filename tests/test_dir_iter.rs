@@ -90,6 +90,7 @@ fn test_dir_iter_basic() {
     }
 }
 
+#[cfg(not(target_os = "android"))]
 #[test]
 fn test_dir_iter_seek() {
     let tmpdir = tempfile::tempdir().unwrap();

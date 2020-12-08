@@ -1,5 +1,6 @@
-// On Linux, O_PATH provides similar (though not *quite* identical) semantics to POSIX's O_SEARCH
-#[cfg(target_os = "linux")]
+// On Linux/Android, O_PATH provides similar (though not *quite* identical) semantics to POSIX's
+// O_SEARCH
+#[cfg(any(target_os = "linux", target_os = "android"))]
 pub const DIR_OPEN_FLAGS: libc::c_int = libc::O_PATH | libc::O_DIRECTORY;
 
 // On FreeBSD, O_SEARCH (added in newer versions) is just an alias for O_EXEC, and O_EXEC on
@@ -17,6 +18,7 @@ pub const DIR_OPEN_FLAGS: libc::c_int = libc::O_SEARCH | libc::O_DIRECTORY;
 // (0o100). Unfortunately, we just won't be able to handle those cases on these platforms.
 #[cfg(not(any(
     target_os = "linux",
+    target_os = "android",
     target_os = "freebsd",
     target_os = "solaris",
     target_os = "illumos",

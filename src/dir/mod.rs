@@ -279,7 +279,7 @@ impl Dir {
     /// - This function may or may not fail with `EACCES` if the currrent process does not have
     ///   access to one or more of this directory's parent directories.
     pub fn recover_path(&self) -> io::Result<PathBuf> {
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         if let Ok(path) = std::fs::read_link(format!("/proc/self/fd/{}", self.fd)) {
             let path_bytes = path.as_os_str().as_bytes();
 

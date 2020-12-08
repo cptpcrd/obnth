@@ -298,7 +298,7 @@ fn do_open_beneath(
     ) -> io::Result<fs::File> {
         let file = util::openat(dir_fd, path, flags | libc::O_NOFOLLOW, mode)?;
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         if flags & (libc::O_PATH | libc::O_NOFOLLOW | libc::O_DIRECTORY) == libc::O_PATH {
             // On Linux, O_PATH|O_NOFOLLOW will return a file descriptor open to the *symlink*
             // (though adding in O_DIRECTORY will prevent this by only allowing a directory). Since

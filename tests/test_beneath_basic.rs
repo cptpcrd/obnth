@@ -34,9 +34,9 @@ fn test_open_beneath_success() {
             LookupFlags::empty(),
             "a",
         ),
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         ("a", libc::O_PATH, LookupFlags::empty(), "a"),
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         (
             "a",
             libc::O_PATH | libc::O_NOFOLLOW,
@@ -51,9 +51,9 @@ fn test_open_beneath_success() {
         ("e", libc::O_RDONLY, LookupFlags::IN_ROOT, "a"),
         ("a/b", libc::O_WRONLY, LookupFlags::empty(), "a/b"),
         ("c", libc::O_WRONLY, LookupFlags::empty(), "a/b"),
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         ("c", libc::O_PATH, LookupFlags::empty(), "a/b"),
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         (
             "c",
             libc::O_PATH | libc::O_NOFOLLOW,
