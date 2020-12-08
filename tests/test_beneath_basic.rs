@@ -70,6 +70,7 @@ fn test_open_beneath_success() {
         ("../../", libc::O_RDONLY, LookupFlags::IN_ROOT, "."),
         ("/a/../..", libc::O_RDONLY, LookupFlags::IN_ROOT, "."),
         ("/../../", libc::O_RDONLY, LookupFlags::IN_ROOT, "."),
+        ("/", libc::O_RDONLY, LookupFlags::IN_ROOT, "."),
     ]
     .iter()
     {
@@ -154,6 +155,18 @@ fn test_open_beneath_error() {
         ("a/b/.", libc::O_RDONLY, LookupFlags::empty(), libc::ENOTDIR),
         ("c", libc::O_RDONLY, LookupFlags::NO_SYMLINKS, libc::ELOOP),
         ("d", libc::O_RDONLY, LookupFlags::NO_SYMLINKS, libc::ELOOP),
+        (
+            "c",
+            libc::O_RDONLY | libc::O_NOFOLLOW,
+            LookupFlags::empty(),
+            libc::ELOOP,
+        ),
+        (
+            "d",
+            libc::O_RDONLY | libc::O_NOFOLLOW,
+            LookupFlags::empty(),
+            libc::ELOOP,
+        ),
         ("loop", libc::O_RDONLY, LookupFlags::empty(), libc::ELOOP),
         ("d", libc::O_RDONLY, LookupFlags::empty(), libc::EXDEV),
         ("e", libc::O_WRONLY, LookupFlags::empty(), libc::EISDIR),
