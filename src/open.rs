@@ -23,6 +23,50 @@ bitflags::bitflags! {
     }
 }
 
+/// Returns `true` if this OS has an equivalent of the `O_SEARCH` flag, which allows opening files
+/// in certain extra cases.
+///
+/// **Note**: This is an edge case; most users are unlikely to encounter cases where this is
+/// relevant. Keep reading if you want more information.
+///
+/// # Unix directory permissions background
+///
+/// - **Read** permission (`r--`, bit 4 in numeric permissions) on a directory allows you to list
+///   the contents of the directory.
+/// - **Write** permission (`-w-`, bit 2 in numeric permissions) on a directory allows you to
+///   create and delete files within the directory.
+/// - **Execute** permission (`--x`, bit 1 in numeric permissions) on a directory allows you to
+///   open files within the directory.
+///
+/// It's important to understand the difference between read and execute permissions:
+/// - If you only have read permission, you can list the contents of the directory, but you can't
+///   access any of the files inside it.
+/// - If you only have execute permission, you can access files within the directory if you know
+///   their names, but you can't list the contents to find out the names in the first place.
+///
+/// In 99% of all cases, you'll have both (`r-x`, 5 in numeric permissions) and this is a
+/// non-issue. Occasionally, however (for example, in shared or public directories), the
+/// distinction can become important, and you may have one but not the other.
+///
+/// # What the return value of this function means
+///
+/// If this function returns `true`, it means that this library is able to open directories
+/// internally for **executing/searching only**. That means that if you don't have read permissions
+/// on a directory, you can still open files within it using this library.
+///
+/// If this function returns `false`, then this library can't open directories for
+/// executing/searching only, and you have to have both read and execute permissions on a directory
+/// to open files inside it with this library.
+///
+/// **Note**: Usually, this will also apply to subdirectories of the initial "root" directory. For
+/// example, if this function returns `false`, something like
+/// `Dir::open("/a").unwrap().open_file().open("b/c")` will fail if you don't have read permission
+/// on both `/a` **and** `/a/b`.
+#[inline]
+pub fn has_o_search() -> bool {
+    constants::DIR_OPEN_FLAGS != libc::O_DIRECTORY | libc::O_RDONLY
+}
+
 /// Open a file beneath the specified directory.
 ///
 /// This is equivalent to `libc::openat(dir_fd, path, flags, mode)` except that the resolved file
