@@ -276,6 +276,9 @@ impl Dir {
 
     /// Recover the path to the directory that this `Dir` is currently open to.
     ///
+    /// **WARNING**: Be careful of race conditions, and **don't** use this path to open any files
+    /// within the directory.
+    ///
     /// OS-specific optimizations:
     /// - On Linux, this will try `readlink("/proc/self/fd/$fd")`.
     /// - On macOS, this will try `fcntl(fd, F_GETPATH)`.
