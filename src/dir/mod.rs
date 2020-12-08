@@ -45,8 +45,15 @@ impl Dir {
         )
     }
 
+    /// Open the parent directory of this directory, without checking if it's open to the root
+    /// directory.
+    ///
+    /// If this directory is open to the root directory, this method will return a new directory
+    /// open to the same directory (similarly to [`try_clone()`]).
+    ///
+    /// [`try_clone()`]: #method.try_clone
     #[inline]
-    fn parent_unchecked(&self) -> io::Result<Self> {
+    pub fn parent_unchecked(&self) -> io::Result<Self> {
         Ok(Self {
             fd: util::openat_raw(
                 self.fd,
