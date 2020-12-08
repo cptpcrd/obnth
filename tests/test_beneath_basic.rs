@@ -209,21 +209,25 @@ fn test_open_beneath_execute() {
                     .unwrap();
 
             assert!(same_file_meta(&file, &fs::metadata(tmpdir.join("a/b")).unwrap()).unwrap());
-        } else {
+        }
+
+        if unsafe { libc::geteuid() } != 0 {
+            if !obnth::has_o_search() {
+                assert_eq!(
+                    obnth::open_beneath(tmpdir_fd, "a/b", libc::O_RDONLY, 0, LookupFlags::empty())
+                        .unwrap_err()
+                        .raw_os_error(),
+                    Some(libc::EACCES)
+                );
+            }
+
             assert_eq!(
-                obnth::open_beneath(tmpdir_fd, "a/b", libc::O_RDONLY, 0, LookupFlags::empty())
+                obnth::open_beneath(tmpdir_fd, "a", libc::O_RDONLY, 0, LookupFlags::empty())
                     .unwrap_err()
                     .raw_os_error(),
                 Some(libc::EACCES)
             );
         }
-
-        assert_eq!(
-            obnth::open_beneath(tmpdir_fd, "a", libc::O_RDONLY, 0, LookupFlags::empty())
-                .unwrap_err()
-                .raw_os_error(),
-            Some(libc::EACCES)
-        );
     });
 
     // So it can be deleted
