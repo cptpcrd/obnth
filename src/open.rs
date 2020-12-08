@@ -104,6 +104,8 @@ fn open_beneath_openat2(
     mode: libc::mode_t,
     lookup_flags: LookupFlags,
 ) -> io::Result<Option<fs::File>> {
+    flags |= libc::O_NOCTTY;
+
     if flags & libc::O_PATH == libc::O_PATH {
         // If we have O_PATH, throw out everything except the O_PATH and the flags that work with
         // it.

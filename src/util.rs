@@ -62,7 +62,7 @@ pub fn openat_raw(
         libc::openat(
             dir_fd,
             path.as_ptr(),
-            flags | libc::O_CLOEXEC,
+            flags | libc::O_CLOEXEC | libc::O_NOCTTY,
             mode as libc::c_uint,
         )
     };
