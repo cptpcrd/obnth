@@ -369,6 +369,18 @@ impl Dir {
         }
     }
 
+    /// Set this process's current working directory to this directory.
+    ///
+    /// This is roughly equivalent to `std::env::set_current_dir(self.recover_path()?)`, but 1) it
+    /// is **much** more efficient, and 2) it is more secure (notably, it avoids race conditions).
+    pub fn change_cwd_to(&self) -> io::Result<()> {
+        if unsafe { libc::fchdir(self.fd) } < 0 {
+            Err(io::Error::last_os_error())
+        } else {
+            Ok(())
+        }
+    }
+
     /// Return an `OpenOptions` struct that can be use to open files within this directory.
     ///
     /// See the documentation of [`OpenOptions`] for more details.
