@@ -480,15 +480,15 @@ fn prepare_inner_operation<'a>(
         }
     }
 
-    // We now know that `path` is not empty, and it doesn't start with a "/"
+    debug_assert!(!path.as_os_str().as_bytes().is_empty());
+    debug_assert!(!path.as_os_str().as_bytes().starts_with(b"/"));
 
     if let Some(fname) = util::path_basename(path) {
         debug_assert!(!path.ends_with(".."));
 
-        let fname = if fname.as_bytes() == b"." {
-            None
-        } else {
-            Some(fname)
+        let fname = match fname.as_bytes() {
+            b"." | b"./" => None,
+            _ => Some(fname),
         };
 
         // Because of the conditions listed above, path.parent() should never be None
