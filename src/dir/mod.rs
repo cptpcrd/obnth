@@ -215,7 +215,7 @@ impl Dir {
             }
         };
 
-        Ok(OsString::from_vec(target.into_bytes()).into())
+        Ok(target)
     }
 
     /// List the contents of this directory.

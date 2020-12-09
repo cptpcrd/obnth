@@ -2,7 +2,7 @@ use std::ffi;
 use std::fs;
 use std::io;
 use std::os::unix::prelude::*;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[cfg(target_os = "linux")]
 pub use libc::__errno_location as errno_ptr;
@@ -84,7 +84,7 @@ pub fn openat(
     Ok(unsafe { fs::File::from_raw_fd(openat_raw(dir_fd, path, flags, mode)?) })
 }
 
-pub fn readlinkat(dir_fd: RawFd, path: &ffi::CStr) -> io::Result<ffi::CString> {
+pub fn readlinkat(dir_fd: RawFd, path: &ffi::CStr) -> io::Result<PathBuf> {
     let mut buf = [0u8; libc::PATH_MAX as usize];
 
     if unsafe {
@@ -103,8 +103,7 @@ pub fn readlinkat(dir_fd: RawFd, path: &ffi::CStr) -> io::Result<ffi::CString> {
             .position(|c| *c == 0)
             .unwrap_or_else(|| buf.len());
 
-        // SAFETY: we cut off the portion after the first nul character
-        Ok(unsafe { ffi::CString::from_vec_unchecked(buf[..len].into()) })
+        Ok(PathBuf::from(ffi::OsString::from_vec(buf[..len].into())))
     }
 }
 

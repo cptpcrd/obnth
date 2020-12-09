@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::collections::VecDeque;
-use std::ffi::{CStr, CString, OsStr};
+use std::ffi::{CStr, CString};
 use std::fs;
 use std::io;
 use std::os::unix::prelude::*;
@@ -438,11 +438,7 @@ fn do_open_beneath(
                             return Err(io::Error::from_raw_os_error(libc::ELOOP));
                         }
 
-                        split_link_path_into(
-                            Path::new(OsStr::from_bytes(target.to_bytes())),
-                            flags,
-                            &mut parts,
-                        )?;
+                        split_link_path_into(&target, flags, &mut parts)?;
                     }
                 }
             }
