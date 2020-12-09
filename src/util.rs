@@ -13,6 +13,31 @@ pub use libc::__error as errno_ptr;
 #[cfg(any(target_os = "android", target_os = "netbsd", target_os = "openbsd"))]
 pub use libc::__errno as errno_ptr;
 
+#[cfg(target_os = "linux")]
+pub fn renameat2(
+    old_dfd: RawFd,
+    old_path: &ffi::CStr,
+    new_dfd: RawFd,
+    new_path: &ffi::CStr,
+    flags: libc::c_int,
+) -> io::Result<()> {
+    if unsafe {
+        libc::syscall(
+            libc::SYS_renameat2,
+            old_dfd,
+            old_path.as_ptr(),
+            new_dfd,
+            new_path.as_ptr(),
+            flags,
+        )
+    } < 0
+    {
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
+}
+
 #[inline]
 pub fn fstat(fd: RawFd) -> io::Result<libc::stat> {
     let mut stat = unsafe { std::mem::zeroed() };
@@ -132,6 +157,42 @@ pub fn unlinkat(dir_fd: RawFd, path: &ffi::CStr, dir: bool) -> io::Result<()> {
 
 pub fn symlinkat(target: &ffi::CStr, dir_fd: RawFd, path: &ffi::CStr) -> io::Result<()> {
     if unsafe { libc::symlinkat(target.as_ptr(), dir_fd, path.as_ptr()) } < 0 {
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
+}
+
+pub fn linkat(
+    old_dfd: RawFd,
+    old_path: &ffi::CStr,
+    new_dfd: RawFd,
+    new_path: &ffi::CStr,
+    flags: libc::c_int,
+) -> io::Result<()> {
+    if unsafe {
+        libc::linkat(
+            old_dfd,
+            old_path.as_ptr(),
+            new_dfd,
+            new_path.as_ptr(),
+            flags,
+        )
+    } < 0
+    {
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
+}
+
+pub fn renameat(
+    old_dfd: RawFd,
+    old_path: &ffi::CStr,
+    new_dfd: RawFd,
+    new_path: &ffi::CStr,
+) -> io::Result<()> {
+    if unsafe { libc::renameat(old_dfd, old_path.as_ptr(), new_dfd, new_path.as_ptr()) } < 0 {
         Err(io::Error::last_os_error())
     } else {
         Ok(())

@@ -14,6 +14,31 @@ pub use file_meta::{FileType, Metadata};
 pub use iter::{Entry, ReadDirIter, SeekPos};
 pub use open_opts::OpenOptions;
 
+#[cfg(target_os = "linux")]
+bitflags::bitflags! {
+    /// Linux-specific: Flags for [`rename2()`].
+    ///
+    /// If any of these flags are not supported by the filesystem, [`rename2()`] will fail with
+    /// `EINVAL`.
+    ///
+    /// [`rename2()`]: ./fn.rename2.html
+    pub struct Rename2Flags: libc::c_int {
+        /// Rename the file without replacing the "new" file if it exists (fail with `EEXIST` in
+        /// that case.
+        ///
+        /// This requires support from the underlying filesystem; older kernels do not support this
+        /// for a number of filesystems. See renameat2(2) for more details.
+        const NOREPLACE = libc::RENAME_NOREPLACE;
+        /// Atomically exchange the "old" and "new" files.
+        const EXCHANGE = libc::RENAME_EXCHANGE;
+        /// Create a "whiteout" object at the source of the rename while performing the rename.
+        /// Useful for overlay/union filesystems.
+        ///
+        /// Requires CAP_MKNOD.
+        const WHITEOUT = libc::RENAME_WHITEOUT;
+    }
+}
+
 #[inline]
 fn cstr(s: &OsStr) -> io::Result<CString> {
     Ok(CString::new(s.as_bytes())?)
@@ -216,6 +241,18 @@ impl Dir {
         };
 
         Ok(target)
+    }
+
+    /// Rename a file in this directory.
+    ///
+    /// This is exactly equivalent to `rename(self, old, self, new, lookup_flags)`.
+    pub fn local_rename<P: AsPath, R: AsPath>(
+        &self,
+        old: P,
+        new: R,
+        lookup_flags: LookupFlags,
+    ) -> io::Result<()> {
+        rename(self, old, self, new, lookup_flags)
     }
 
     /// List the contents of this directory.
@@ -438,6 +475,148 @@ impl FromRawFd for Dir {
     #[inline]
     unsafe fn from_raw_fd(fd: RawFd) -> Self {
         Self { fd }
+    }
+}
+
+/// Create a hardlink to a file in (possibly) a different directory.
+pub fn hardlink<P, R>(
+    old_dir: &Dir,
+    old_path: P,
+    new_dir: &Dir,
+    new_path: R,
+    lookup_flags: LookupFlags,
+) -> io::Result<()>
+where
+    P: AsPath,
+    R: AsPath,
+{
+    let (old_subdir, old_fname) =
+        prepare_inner_operation(old_dir, old_path.as_path(), lookup_flags)?;
+
+    let old_fname = if let Some(old_fname) = old_fname {
+        old_fname
+    } else {
+        // Assume we can't create hardlinks to directories (it seems that macOS *can*, but it's
+        // hacky)
+        return Err(std::io::Error::from_raw_os_error(libc::EPERM));
+    };
+
+    let (new_subdir, new_fname) =
+        prepare_inner_operation(new_dir, new_path.as_path(), lookup_flags)?;
+
+    let old_subdir = old_subdir.as_ref().unwrap_or(old_dir);
+    let new_subdir = new_subdir.as_ref().unwrap_or(new_dir);
+
+    if let Some(new_fname) = new_fname {
+        old_fname.with_cstr(|old_fname| {
+            new_fname.with_cstr(|new_fname| {
+                util::linkat(
+                    old_subdir.as_raw_fd(),
+                    old_fname,
+                    new_subdir.as_raw_fd(),
+                    new_fname,
+                    0,
+                )
+            })
+        })
+    } else {
+        // The "new" path cannot exist already
+        Err(std::io::Error::from_raw_os_error(libc::EEXIST))
+    }
+}
+
+/// Rename a file across directories.
+pub fn rename<P, R>(
+    old_dir: &Dir,
+    old_path: P,
+    new_dir: &Dir,
+    new_path: R,
+    lookup_flags: LookupFlags,
+) -> io::Result<()>
+where
+    P: AsPath,
+    R: AsPath,
+{
+    let (old_subdir, old_fname) =
+        prepare_inner_operation(old_dir, old_path.as_path(), lookup_flags)?;
+    let old_subdir = old_subdir.as_ref().unwrap_or(old_dir);
+
+    let old_fname = if let Some(old_fname) = old_fname {
+        old_fname
+    } else {
+        return Err(std::io::Error::from_raw_os_error(libc::EBUSY));
+    };
+
+    let (new_subdir, new_fname) =
+        prepare_inner_operation(new_dir, new_path.as_path(), lookup_flags)?;
+    let new_subdir = new_subdir.as_ref().unwrap_or(new_dir);
+
+    if let Some(new_fname) = new_fname {
+        old_fname.with_cstr(|old_fname| {
+            new_fname.with_cstr(|new_fname| {
+                util::renameat(
+                    old_subdir.as_raw_fd(),
+                    old_fname,
+                    new_subdir.as_raw_fd(),
+                    new_fname,
+                )
+            })
+        })
+    } else {
+        Err(std::io::Error::from_raw_os_error(libc::EBUSY))
+    }
+}
+
+/// Linux-specific: Rename a file across directories, specifying extra flags to modify behavior.
+///
+/// This calls the `renameat2()` syscall, which was added in Linux 3.15. It will fail with `ENOSYS`
+/// on older kernels, and it will fail with `EINVAL` if any of the given `flags` are not supported
+/// by the filesystem. See renameat2(2) for more details.
+///
+/// Otherwise, the semantics of this are identical to [`rename()`].
+///
+/// [`rename()`]: ./fn.rename.html
+#[cfg(target_os = "linux")]
+pub fn rename2<P, R>(
+    old_dir: &Dir,
+    old_path: P,
+    new_dir: &Dir,
+    new_path: R,
+    flags: Rename2Flags,
+    lookup_flags: LookupFlags,
+) -> io::Result<()>
+where
+    P: AsPath,
+    R: AsPath,
+{
+    let (old_subdir, old_fname) =
+        prepare_inner_operation(old_dir, old_path.as_path(), lookup_flags)?;
+    let old_subdir = old_subdir.as_ref().unwrap_or(old_dir);
+
+    let old_fname = if let Some(old_fname) = old_fname {
+        old_fname
+    } else {
+        return Err(std::io::Error::from_raw_os_error(libc::EBUSY));
+    };
+
+    let (new_subdir, new_fname) =
+        prepare_inner_operation(new_dir, new_path.as_path(), lookup_flags)?;
+    let new_subdir = new_subdir.as_ref().unwrap_or(new_dir);
+
+    if let Some(new_fname) = new_fname {
+        old_fname.with_cstr(|old_fname| {
+            new_fname.with_cstr(|new_fname| {
+                util::renameat2(
+                    old_subdir.as_raw_fd(),
+                    old_fname,
+                    new_subdir.as_raw_fd(),
+                    new_fname,
+                    flags.bits,
+                )
+            })
+        })
+    } else {
+        Err(std::io::Error::from_raw_os_error(libc::EBUSY))
     }
 }
 
