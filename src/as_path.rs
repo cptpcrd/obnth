@@ -19,6 +19,10 @@ pub trait AsPath {
     ///
     /// The `CStr` may actually be a `CString` (allocated from the heap), or it may be the original
     /// string if that string is already nul-terminated.
+    ///
+    /// IMPORTANT: If the string contains an interior nul byte that prevents it from being converted
+    /// to a `CString`, the closure will not be called, and a `std::io::Error` converted from a
+    /// `std::ffi::NulError` will be returned.
     #[inline]
     fn with_cstr<T, F: FnMut(&CStr) -> io::Result<T>>(&self, mut f: F) -> io::Result<T> {
         f(&CString::new(self.as_path().as_os_str().as_bytes())?)
