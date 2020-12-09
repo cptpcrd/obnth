@@ -1,4 +1,5 @@
 use std::fs;
+use std::os::unix::prelude::*;
 use std::path::Path;
 
 use obnth::{Dir, LookupFlags};
@@ -9,6 +10,18 @@ fn test_parent() {
     assert!(Dir::open(temp_dir).unwrap().parent().unwrap().is_some());
 
     assert!(Dir::open("/").unwrap().parent().unwrap().is_none());
+}
+
+#[test]
+fn test_into_from_raw_fd() {
+    let temp_dir = Dir::open(std::env::temp_dir()).unwrap();
+    let meta1 = temp_dir.self_metadata().unwrap();
+
+    let temp_dir = unsafe { Dir::from_raw_fd(temp_dir.into_raw_fd()) };
+    let meta2 = temp_dir.self_metadata().unwrap();
+
+    assert_eq!(meta1.stat().st_ino, meta2.stat().st_ino);
+    assert_eq!(meta1.stat().st_dev, meta2.stat().st_dev);
 }
 
 #[test]
@@ -65,6 +78,50 @@ fn test_create_remove_dir() {
         .remove_dir("dir/subdir", LookupFlags::empty())
         .unwrap();
     tmpdir.remove_dir("dir", LookupFlags::empty()).unwrap();
+}
+
+#[test]
+fn test_open_file_lookup_flags() {
+    let tmpdir = tempfile::tempdir().unwrap();
+    let tmpdir_path = tmpdir.as_ref();
+    let tmpdir = Dir::open(tmpdir_path).unwrap();
+
+    tmpdir
+        .symlink("link", "target", LookupFlags::empty())
+        .unwrap();
+
+    assert_eq!(
+        tmpdir
+            .open_file()
+            .read(true)
+            .lookup_flags(LookupFlags::NO_SYMLINKS)
+            .open("link")
+            .unwrap_err()
+            .raw_os_error(),
+        Some(libc::ELOOP),
+    );
+
+    assert_eq!(
+        tmpdir
+            .open_file()
+            .read(true)
+            .lookup_flags(LookupFlags::empty())
+            .open("/link")
+            .unwrap_err()
+            .raw_os_error(),
+        Some(libc::EXDEV),
+    );
+
+    assert_eq!(
+        tmpdir
+            .open_file()
+            .read(true)
+            .lookup_flags(LookupFlags::IN_ROOT)
+            .open("/link")
+            .unwrap_err()
+            .raw_os_error(),
+        Some(libc::ENOENT),
+    );
 }
 
 #[test]
@@ -204,4 +261,32 @@ fn test_symlinks() {
             Some(*eno),
         );
     }
+}
+
+#[test]
+fn test_change_cwd_to() {
+    // No-op... unfortunately we can't test much more without messing up other threads
+    Dir::open(".").unwrap().change_cwd_to().unwrap();
+
+    assert_eq!(
+        unsafe { Dir::from_raw_fd(-1) }
+            .change_cwd_to()
+            .unwrap_err()
+            .raw_os_error(),
+        Some(libc::EBADF)
+    );
+
+    assert_eq!(
+        unsafe {
+            Dir::from_raw_fd(
+                fs::File::open(std::env::current_exe().unwrap())
+                    .unwrap()
+                    .into_raw_fd(),
+            )
+        }
+        .change_cwd_to()
+        .unwrap_err()
+        .raw_os_error(),
+        Some(libc::ENOTDIR)
+    );
 }
