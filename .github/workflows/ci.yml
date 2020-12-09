@@ -15,12 +15,44 @@ jobs:
       matrix:
         toolchain: [stable, beta, nightly]
         target:
+          - x86_64-linux-android
+          - x86_64-unknown-netbsd
+        os: [ubuntu-latest]
+
+    # Allow nightly builds to fail
+    continue-on-error: ${{ matrix.toolchain == 'nightly' }}
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Set up repo
+        uses: actions/checkout@v2
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          target: ${{ matrix.target }}
+
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          command: build
+          args: --verbose --target ${{ matrix.target }}
+
+  test:
+    name: Test
+
+    strategy:
+      fail-fast: false
+
+      matrix:
+        toolchain: [stable, beta, nightly]
+        target:
           - x86_64-unknown-linux-gnu
           - x86_64-unknown-linux-musl
           - i686-unknown-linux-gnu
           - i686-unknown-linux-musl
-          - x86_64-linux-android
-          - x86_64-unknown-netbsd
         os: [ubuntu-latest]
         features:
           - ''
@@ -54,25 +86,12 @@ jobs:
         run: sudo apt install gcc-multilib
         if: matrix.os == 'ubuntu-latest' && matrix.target == 'i686-unknown-linux-gnu'
 
-      - name: Build
-        uses: actions-rs/cargo@v1
-        with:
-          toolchain: ${{ matrix.toolchain }}
-          command: build
-          args: --verbose --target ${{ matrix.target }} --no-default-features --features "${{ matrix.features }}"
-
       - name: Run tests
         uses: actions-rs/cargo@v1
         with:
           toolchain: ${{ matrix.toolchain }}
           command: test
           args: --verbose --target ${{ matrix.target }} --no-default-features --features "${{ matrix.features }}"
-        # Only try to run the tests if the OS/architecture we're building for
-        # matches the host machine.
-        if: >-
-          matrix.os == 'ubuntu-latest' && (startsWith(matrix.target, 'x86_64-unknown-linux-')
-              || startsWith(matrix.target, 'i686-unknown-linux-'))
-          || matrix.os == 'macos-latest' && startsWith(matrix.target, 'x86_64-apple-darwin')
 
   coverage-tarpaulin:
     name: Tarpaulin
