@@ -41,8 +41,12 @@ fn test_create_remove_dir() {
         ("dir", LookupFlags::empty(), libc::EEXIST),
         ("dir/subdir", LookupFlags::empty(), libc::EEXIST),
         (".", LookupFlags::empty(), libc::EEXIST),
+        ("./", LookupFlags::empty(), libc::EEXIST),
+        (".//", LookupFlags::empty(), libc::EEXIST),
         ("/", LookupFlags::IN_ROOT, libc::EEXIST),
+        ("//", LookupFlags::IN_ROOT, libc::EEXIST),
         ("..", LookupFlags::IN_ROOT, libc::EEXIST),
+        ("../", LookupFlags::IN_ROOT, libc::EEXIST),
         ("dir/subdir/..", LookupFlags::empty(), libc::EEXIST),
     ]
     .iter()
