@@ -162,6 +162,11 @@ impl Entry {
     }
 
     /// Get this entry's inode.
+    ///
+    /// Note: If this entry refers to a mountpoint (including bind mounts on Linux), this may be
+    /// the inode of the *underlying directory* on which the filesystem is mounted. So this value
+    /// may not match, for example, `self.metadata()?.stat.st_ino` (which looks up the actual root
+    /// directory of the mountpoint).
     #[inline]
     pub fn inode(&self) -> u64 {
         self.ino
