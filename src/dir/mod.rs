@@ -405,6 +405,15 @@ impl Dir {
     }
 }
 
+impl Drop for Dir {
+    #[inline]
+    fn drop(&mut self) {
+        unsafe {
+            libc::close(self.fd);
+        }
+    }
+}
+
 impl AsRawFd for Dir {
     #[inline]
     fn as_raw_fd(&self) -> RawFd {
@@ -415,7 +424,9 @@ impl AsRawFd for Dir {
 impl IntoRawFd for Dir {
     #[inline]
     fn into_raw_fd(self) -> RawFd {
-        self.fd
+        let fd = self.fd;
+        std::mem::forget(self);
+        fd
     }
 }
 
