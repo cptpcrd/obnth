@@ -2,7 +2,11 @@ use std::fs;
 use std::os::unix::prelude::*;
 use std::path::Path;
 
-use obnth::{Dir, LookupFlags};
+use obnth::{Dir, LookupFlags, Metadata};
+
+fn same_meta(m1: &Metadata, m2: &Metadata) -> bool {
+    m1.stat().st_ino == m2.stat().st_ino && m1.stat().st_dev == m2.stat().st_dev
+}
 
 #[test]
 fn test_parent() {
@@ -20,8 +24,7 @@ fn test_into_from_raw_fd() {
     let temp_dir = unsafe { Dir::from_raw_fd(temp_dir.into_raw_fd()) };
     let meta2 = temp_dir.self_metadata().unwrap();
 
-    assert_eq!(meta1.stat().st_ino, meta2.stat().st_ino);
-    assert_eq!(meta1.stat().st_dev, meta2.stat().st_dev);
+    assert!(same_meta(&meta1, &meta2));
 }
 
 #[test]
@@ -293,4 +296,202 @@ fn test_change_cwd_to() {
         .raw_os_error(),
         Some(libc::ENOTDIR)
     );
+}
+
+#[test]
+fn test_hardlink() {
+    let tmpdir = tempfile::tempdir().unwrap();
+    let tmpdir_path = tmpdir.as_ref();
+    let tmpdir = Dir::open(tmpdir_path).unwrap();
+
+    tmpdir
+        .open_file()
+        .write(true)
+        .create_new(true)
+        .open("a")
+        .unwrap();
+
+    tmpdir
+        .create_dir("dir", 0o777, LookupFlags::empty())
+        .unwrap();
+    tmpdir
+        .create_dir("dir2", 0o777, LookupFlags::empty())
+        .unwrap();
+
+    let a_meta = tmpdir.metadata("a", LookupFlags::empty()).unwrap();
+
+    obnth::hardlink(&tmpdir, "a", &tmpdir, "dir/a", LookupFlags::empty()).unwrap();
+
+    assert!(same_meta(
+        &a_meta,
+        &tmpdir.metadata("a", LookupFlags::empty()).unwrap()
+    ));
+    assert!(same_meta(
+        &a_meta,
+        &tmpdir.metadata("dir/a", LookupFlags::empty()).unwrap()
+    ));
+
+    assert_eq!(
+        obnth::hardlink(&tmpdir, "dir", &tmpdir, "dir3", LookupFlags::empty())
+            .unwrap_err()
+            .raw_os_error(),
+        Some(libc::EPERM)
+    );
+
+    assert_eq!(
+        obnth::hardlink(&tmpdir, "dir/..", &tmpdir, "dir2", LookupFlags::empty())
+            .unwrap_err()
+            .raw_os_error(),
+        Some(libc::EPERM)
+    );
+
+    assert_eq!(
+        obnth::hardlink(&tmpdir, "dir", &tmpdir, "dir2/.", LookupFlags::empty())
+            .unwrap_err()
+            .raw_os_error(),
+        Some(libc::EEXIST)
+    );
+}
+
+#[test]
+fn test_rename() {
+    let tmpdir = tempfile::tempdir().unwrap();
+    let tmpdir_path = tmpdir.as_ref();
+    let tmpdir = Dir::open(tmpdir_path).unwrap();
+
+    tmpdir
+        .open_file()
+        .write(true)
+        .create_new(true)
+        .open("a")
+        .unwrap();
+
+    tmpdir
+        .create_dir("dir", 0o777, LookupFlags::empty())
+        .unwrap();
+    tmpdir
+        .create_dir("dir2", 0o777, LookupFlags::empty())
+        .unwrap();
+
+    let a_meta = tmpdir.metadata("a", LookupFlags::empty()).unwrap();
+    let dir_meta = tmpdir.metadata("dir", LookupFlags::empty()).unwrap();
+
+    tmpdir
+        .local_rename("a", "dir/a", LookupFlags::empty())
+        .unwrap();
+
+    assert!(same_meta(
+        &a_meta,
+        &tmpdir.metadata("dir/a", LookupFlags::empty()).unwrap()
+    ));
+
+    assert_eq!(
+        tmpdir
+            .local_rename("dir/..", "dir2", LookupFlags::empty())
+            .unwrap_err()
+            .raw_os_error(),
+        Some(libc::EBUSY)
+    );
+
+    assert_eq!(
+        tmpdir
+            .local_rename("dir", "dir2/.", LookupFlags::empty())
+            .unwrap_err()
+            .raw_os_error(),
+        Some(libc::EBUSY)
+    );
+
+    tmpdir
+        .local_rename("dir", "dir2", LookupFlags::empty())
+        .unwrap();
+
+    assert!(same_meta(
+        &dir_meta,
+        &tmpdir.metadata("dir2", LookupFlags::empty()).unwrap()
+    ));
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn test_rename2() {
+    use obnth::{rename2, Rename2Flags};
+
+    let tmpdir = tempfile::tempdir().unwrap();
+    let tmpdir_path = tmpdir.as_ref();
+    let tmpdir = Dir::open(tmpdir_path).unwrap();
+
+    tmpdir
+        .open_file()
+        .write(true)
+        .create_new(true)
+        .open("a")
+        .unwrap();
+
+    tmpdir
+        .create_dir("dir", 0o777, LookupFlags::empty())
+        .unwrap();
+    tmpdir
+        .create_dir("dir2", 0o777, LookupFlags::empty())
+        .unwrap();
+
+    let a_meta = tmpdir.metadata("a", LookupFlags::empty()).unwrap();
+    let dir_meta = tmpdir.metadata("dir", LookupFlags::empty()).unwrap();
+
+    rename2(
+        &tmpdir,
+        "a",
+        &tmpdir,
+        "dir/a",
+        Rename2Flags::empty(),
+        LookupFlags::empty(),
+    )
+    .unwrap();
+
+    assert!(same_meta(
+        &a_meta,
+        &tmpdir.metadata("dir/a", LookupFlags::empty()).unwrap()
+    ));
+
+    assert_eq!(
+        rename2(
+            &tmpdir,
+            "dir/..",
+            &tmpdir,
+            "dir2",
+            Rename2Flags::empty(),
+            LookupFlags::empty()
+        )
+        .unwrap_err()
+        .raw_os_error(),
+        Some(libc::EBUSY)
+    );
+
+    assert_eq!(
+        rename2(
+            &tmpdir,
+            "dir",
+            &tmpdir,
+            "dir2/.",
+            Rename2Flags::empty(),
+            LookupFlags::empty()
+        )
+        .unwrap_err()
+        .raw_os_error(),
+        Some(libc::EBUSY)
+    );
+
+    rename2(
+        &tmpdir,
+        "dir",
+        &tmpdir,
+        "dir2",
+        Rename2Flags::empty(),
+        LookupFlags::empty(),
+    )
+    .unwrap();
+
+    assert!(same_meta(
+        &dir_meta,
+        &tmpdir.metadata("dir2", LookupFlags::empty()).unwrap()
+    ));
 }
