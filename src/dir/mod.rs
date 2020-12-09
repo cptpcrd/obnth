@@ -224,6 +224,8 @@ impl Dir {
     }
 
     /// List the contents of the specified subdirectory.
+    ///
+    /// This is equivalent to `self.sub_dir(path, lookup_flags)?.list_self()`, but more efficient.
     pub fn list_dir<P: AsPath>(
         &self,
         path: P,
@@ -241,7 +243,9 @@ impl Dir {
         )
     }
 
-    /// Try to "clone" this directory.
+    /// Try to "clone" this `Dir`.
+    ///
+    /// This is equivalent to `self.sub_dir(".")`, but more efficient.
     pub fn try_clone(&self) -> io::Result<Self> {
         Ok(Self {
             fd: util::dup(self.fd)?,
