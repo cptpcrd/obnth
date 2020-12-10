@@ -387,6 +387,14 @@ fn test_rename() {
 
     assert_eq!(
         tmpdir
+            .local_rename("NOEXIST", "dir2", LookupFlags::empty())
+            .unwrap_err()
+            .raw_os_error(),
+        Some(libc::ENOENT)
+    );
+
+    assert_eq!(
+        tmpdir
             .local_rename("dir/..", "dir2", LookupFlags::empty())
             .unwrap_err()
             .raw_os_error(),
@@ -451,6 +459,20 @@ fn test_rename2() {
         &a_meta,
         &tmpdir.metadata("dir/a", LookupFlags::empty()).unwrap()
     ));
+
+    assert_eq!(
+        rename2(
+            &tmpdir,
+            "NOEXIST",
+            &tmpdir,
+            "dir2",
+            Rename2Flags::empty(),
+            LookupFlags::empty()
+        )
+        .unwrap_err()
+        .raw_os_error(),
+        Some(libc::ENOENT)
+    );
 
     assert_eq!(
         rename2(
