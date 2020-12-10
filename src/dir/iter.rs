@@ -168,7 +168,7 @@ impl Entry {
     /// may not match, for example, `self.metadata()?.stat.st_ino` (which looks up the actual root
     /// directory of the mountpoint).
     #[inline]
-    pub fn inode(&self) -> u64 {
+    pub fn ino(&self) -> u64 {
         self.ino
     }
 

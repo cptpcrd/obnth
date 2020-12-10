@@ -83,7 +83,7 @@ fn test_dir_iter_basic() {
     entries.sort_unstable_by(|a, b| a.name().cmp(b.name()));
     for (entry, (name, ino, expect_ftype)) in entries.iter().zip(expected_entries.iter()) {
         assert_eq!(entry.name().as_bytes(), *name);
-        assert_eq!(entry.inode(), *ino);
+        assert_eq!(entry.ino(), *ino);
         if let Some(ftype) = entry.file_type() {
             assert_eq!(ftype, *expect_ftype);
         }
