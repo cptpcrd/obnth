@@ -70,4 +70,16 @@ impl Metadata {
     pub fn len(&self) -> u64 {
         self.stat.st_size as u64
     }
+
+    /// Return the ID of the device containing the file.
+    #[inline]
+    pub fn dev(&self) -> u64 {
+        self.stat.st_dev as u64
+    }
+
+    /// Return the file's inode number
+    #[inline]
+    pub fn ino(&self) -> u64 {
+        self.stat.st_ino as u64
+    }
 }

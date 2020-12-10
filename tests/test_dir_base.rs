@@ -5,7 +5,7 @@ use std::path::Path;
 use obnth::{Dir, LookupFlags, Metadata};
 
 fn same_meta(m1: &Metadata, m2: &Metadata) -> bool {
-    m1.stat().st_ino == m2.stat().st_ino && m1.stat().st_dev == m2.stat().st_dev
+    m1.ino() == m2.ino() && m1.dev() == m2.dev()
 }
 
 #[test]
