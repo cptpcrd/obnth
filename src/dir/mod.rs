@@ -372,12 +372,8 @@ impl Dir {
 
                 match entry.file_type() {
                     Some(FileType::Directory) | None => {
-                        if let Ok(entry_stat) = util::fstatat(
-                            parent.as_raw_fd(),
-                            entry.c_name(),
-                            libc::AT_SYMLINK_NOFOLLOW,
-                        ) {
-                            if util::samestat(sub_meta.stat(), &entry_stat) {
+                        if let Ok(entry_meta) = entry.metadata() {
+                            if same_meta(sub_meta, &entry_meta) {
                                 return Ok(entry);
                             }
                         }

@@ -39,6 +39,7 @@ fn check_file_type(path: &Path, ftype: FileType) {
             if let Some(entry_ftype) = entry.file_type() {
                 assert_eq!(entry_ftype, ftype);
             }
+            assert_eq!(entry.metadata().unwrap().file_type(), ftype);
             found = true;
             break;
         }
