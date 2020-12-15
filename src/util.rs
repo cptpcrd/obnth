@@ -4,10 +4,10 @@ use std::io;
 use std::os::unix::prelude::*;
 use std::path::{Path, PathBuf};
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "dragonfly"))]
 pub use libc::__errno_location as errno_ptr;
 
-#[cfg(any(target_os = "freebsd", target_os = "dragonfly", target_os = "macos"))]
+#[cfg(any(target_os = "freebsd", target_os = "macos"))]
 pub use libc::__error as errno_ptr;
 
 #[cfg(any(target_os = "android", target_os = "netbsd", target_os = "openbsd"))]
