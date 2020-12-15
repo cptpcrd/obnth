@@ -15,6 +15,7 @@ pub enum FileType {
 }
 
 /// Represents metadata information about a file. Similar to `std::fs::Metadata`.
+#[derive(Copy, Clone, Debug)]
 pub struct Metadata {
     stat: libc::stat,
 }
