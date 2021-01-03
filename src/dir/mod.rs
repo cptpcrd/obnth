@@ -24,7 +24,7 @@ bitflags::bitflags! {
     /// [`rename2()`]: ./fn.rename2.html
     pub struct Rename2Flags: libc::c_int {
         /// Rename the file without replacing the "new" file if it exists (fail with `EEXIST` in
-        /// that case.
+        /// that case).
         ///
         /// This requires support from the underlying filesystem; older kernels do not support this
         /// for a number of filesystems. See renameat2(2) for more details.
