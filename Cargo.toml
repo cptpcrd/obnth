@@ -3,8 +3,13 @@ name = "obnth"
 version = "0.1.0"
 edition = "2018"
 
+description = "Allows securely opening files in untrusted directories on *nix systems."
+readme = "README.md"
 authors = ["cptpcrd"]
 license = "MIT"
+categories = ["filesystem"]
+keywords = ["chroot", "open", "secure"]
+repository = "https://github.com/cptpcrd/obnth"
 
 [features]
 default = ["openat2"]
