@@ -14,6 +14,7 @@ repository = "https://github.com/cptpcrd/obnth"
 [features]
 default = ["openat2"]
 
+# Enable using openat2() on Linux (ignored on other platforms)
 openat2 = []
 
 [dependencies]
