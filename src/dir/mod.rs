@@ -370,8 +370,13 @@ impl Dir {
             for entry in parent.list_self()? {
                 let entry = entry?;
 
+                // Only check directories (or files with unknown types)
                 match entry.file_type() {
                     Some(FileType::Directory) | None => {
+                        // stat() the entry and see if it matches.
+                        //
+                        // We can't check entry.ino() to avoid stat() because that doesn't work
+                        // when you cross filesystem boundaries.
                         if let Ok(entry_meta) = entry.metadata() {
                             if same_meta(sub_meta, &entry_meta) {
                                 return Ok(entry);

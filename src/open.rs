@@ -350,6 +350,8 @@ fn do_open_beneath(
                 }
 
                 cur_file = None;
+
+                // It's impossible for us to see `/` immediately after seeing `..`.
                 debug_assert!(!saw_parent_elem);
             }
 
@@ -412,7 +414,7 @@ fn do_open_beneath(
                         }
 
                         // It may have failed because it's a symlink.
-                        // (If ex.errno != errno.ENOTDIR, it's definitely a symlink.)
+                        // (If eno == libc::ELOOP, it's definitely a symlink.)
 
                         // If we know it's definitely a symlink, and either a) we were given
                         // O_NOFOLLOW for this component, or b) we can't resolve any more symlinks,
