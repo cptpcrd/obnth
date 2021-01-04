@@ -6,14 +6,12 @@ use std::os::unix::prelude::*;
 use obnth::{Dir, Entry, FileType, LookupFlags};
 
 fn check_entries_match(entries_a: &[Entry], entries_b: &[Entry]) {
-    use std::iter::FromIterator;
-
     assert_eq!(entries_a.len(), entries_b.len());
 
-    let mut entries_a = Vec::from_iter(entries_a.iter().cloned());
+    let mut entries_a = entries_a.to_vec();
     entries_a.sort_unstable_by(|a, b| a.name().cmp(b.name()));
 
-    let mut entries_b = Vec::from_iter(entries_b.iter().cloned());
+    let mut entries_b = entries_b.to_vec();
     entries_b.sort_unstable_by(|a, b| a.name().cmp(b.name()));
 
     for (a, b) in entries_a.iter().zip(entries_b.iter()) {
