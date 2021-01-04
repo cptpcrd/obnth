@@ -75,9 +75,14 @@ pub fn has_o_search() -> bool {
 
 /// Open a file beneath the specified directory.
 ///
-/// This is equivalent to `libc::openat(dir_fd, path, flags, mode)` except that the resolved file
-/// is guaranteed to be within the directory referred to by `dir_fd` (and the `lookup_flags`
-/// argument can further alter behavior; see [`LookupFlags`] for more information).
+/// This is equivalent to `libc::openat(dir_fd, path, flags, mode)` except for the following
+/// differences:
+///
+/// 1. The resolved file is guaranteed to be within the directory referred to by `dir_fd`.
+/// 2. The `lookup_flags` argument can further alter behavior during path resolution; see
+///    [`LookupFlags`] for more information.
+/// 3. The file will be opened with `O_CLOEXEC|O_NOCTTY`, so its close-on-exec flag will be set and
+///    it cannot become the process's controlling terminal.
 ///
 /// [`LookupFlags`]: ./struct.LookupFlags.html
 pub fn open_beneath<P: AsPath>(
