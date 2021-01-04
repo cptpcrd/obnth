@@ -169,6 +169,7 @@ fn test_open_beneath_error() {
             LookupFlags::empty(),
             libc::ELOOP,
         ),
+        ("e/b", libc::O_RDONLY, LookupFlags::NO_SYMLINKS, libc::ELOOP),
         ("loop", libc::O_RDONLY, LookupFlags::empty(), libc::ELOOP),
         ("d", libc::O_RDONLY, LookupFlags::empty(), libc::EXDEV),
         ("e", libc::O_WRONLY, LookupFlags::empty(), libc::EISDIR),

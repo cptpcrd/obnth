@@ -414,6 +414,16 @@ fn do_open_beneath(
                         // It may have failed because it's a symlink.
                         // (If ex.errno != errno.ENOTDIR, it's definitely a symlink.)
 
+                        // If we know it's definitely a symlink, and either a) we were given
+                        // O_NOFOLLOW for this component, or b) we can't resolve any more symlinks,
+                        // then let's skip the readlinkat() check and return ELOOP directly.
+                        if eno == libc::ELOOP
+                            && (flags & libc::O_NOFOLLOW == libc::O_NOFOLLOW
+                                || found_symlinks >= max_symlinks)
+                        {
+                            return Err(io::Error::from_raw_os_error(libc::ELOOP));
+                        }
+
                         let target = match util::readlinkat(cur_fd, &part) {
                             // Successfully read the symlink
                             Ok(t) => t,
