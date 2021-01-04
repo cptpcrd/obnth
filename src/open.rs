@@ -251,7 +251,7 @@ fn check_beneath(base_fd: RawFd, dir_fd_stat: &libc::stat) -> io::Result<()> {
     // We need to rewind up the directory tree and make sure that we didn't escape because of
     // race conditions with "..".
 
-    let mut prev_stat = util::fstat(base_fd)?;
+    let mut prev_stat = unsafe { std::mem::zeroed() };
 
     let mut cur_file: Option<fs::File> = None;
 
@@ -263,7 +263,7 @@ fn check_beneath(base_fd: RawFd, dir_fd_stat: &libc::stat) -> io::Result<()> {
         if util::samestat(&cur_stat, dir_fd_stat) {
             // We found it! We *didn't* escape.
             return Ok(());
-        } else if cur_fd != base_fd && util::samestat(&cur_stat, &prev_stat) {
+        } else if cur_file.is_some() && util::samestat(&cur_stat, &prev_stat) {
             // Trying to open ".." brought us the same directory. That means we're at "/"
             // (the REAL "/").
             // So we escaped the "beneath" directory.
