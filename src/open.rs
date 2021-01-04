@@ -373,7 +373,7 @@ fn do_open_beneath(
                 }
             }
 
-            b"." => debug_assert!(flags == constants::DIR_OPEN_FLAGS || cur_file.is_none()),
+            b"." => (),
 
             _ => {
                 if saw_parent_elem {

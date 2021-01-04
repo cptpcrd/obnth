@@ -26,6 +26,7 @@ fn test_open_beneath_success() {
     std::os::unix::fs::symlink("/a/b", tmpdir.join("d")).unwrap();
     std::os::unix::fs::symlink("a/", tmpdir.join("e")).unwrap();
     std::os::unix::fs::symlink("/", tmpdir.join("f")).unwrap();
+    std::os::unix::fs::symlink("./b", tmpdir.join("a/g")).unwrap();
 
     for (path, flags, lookup_flags, same_path) in [
         (
@@ -65,6 +66,7 @@ fn test_open_beneath_success() {
         ("c", libc::O_WRONLY, LookupFlags::IN_ROOT, "a/b"),
         ("d", libc::O_WRONLY, LookupFlags::IN_ROOT, "a/b"),
         ("f", libc::O_RDONLY, LookupFlags::IN_ROOT, "."),
+        ("a/g", libc::O_RDONLY, LookupFlags::IN_ROOT, "a/b"),
         ("a/..", libc::O_RDONLY, LookupFlags::IN_ROOT, "."),
         ("a/../..", libc::O_RDONLY, LookupFlags::IN_ROOT, "."),
         ("../../", libc::O_RDONLY, LookupFlags::IN_ROOT, "."),
