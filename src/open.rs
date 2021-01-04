@@ -508,6 +508,28 @@ mod tests {
         );
 
         assert_eq!(
+            split_path("./abc/./../def/".as_ref(), libc::O_RDONLY).unwrap(),
+            &[
+                (
+                    Cow::Owned(CString::new(".").unwrap()),
+                    constants::DIR_OPEN_FLAGS
+                ),
+                (
+                    Cow::Owned(CString::new("abc").unwrap()),
+                    constants::DIR_OPEN_FLAGS
+                ),
+                (
+                    Cow::Owned(CString::new("..").unwrap()),
+                    constants::DIR_OPEN_FLAGS
+                ),
+                (
+                    Cow::Owned(CString::new("def").unwrap()),
+                    libc::O_RDONLY | libc::O_DIRECTORY
+                )
+            ]
+        );
+
+        assert_eq!(
             split_path("".as_ref(), libc::O_RDONLY)
                 .unwrap_err()
                 .raw_os_error(),
@@ -564,6 +586,28 @@ mod tests {
             Some(libc::ENOENT)
         );
         assert!(parts.is_empty());
+
+        parts.push_back((Cow::Owned(CString::new("END").unwrap()), 0));
+        split_link_path_into("./abc/./def/.".as_ref(), libc::O_RDONLY, &mut parts).unwrap();
+        assert_eq!(
+            parts,
+            &[
+                (
+                    Cow::Owned(CString::new(".").unwrap()),
+                    constants::DIR_OPEN_FLAGS
+                ),
+                (
+                    Cow::Owned(CString::new("abc").unwrap()),
+                    constants::DIR_OPEN_FLAGS
+                ),
+                (
+                    Cow::Owned(CString::new("def").unwrap()),
+                    libc::O_RDONLY | libc::O_DIRECTORY
+                ),
+                (Cow::Owned(CString::new("END").unwrap()), 0),
+            ]
+        );
+        parts.clear();
     }
 
     #[test]
