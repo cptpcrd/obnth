@@ -145,17 +145,7 @@ impl Dir {
                 res => res,
             }
         } else {
-            let is_same = if let Some(subdir) = subdir.as_ref() {
-                same_dir(self, subdir)?
-            } else {
-                true
-            };
-
-            Err(std::io::Error::from_raw_os_error(if is_same {
-                libc::EBUSY
-            } else {
-                libc::ENOTEMPTY
-            }))
+            Err(std::io::Error::from_raw_os_error(libc::EBUSY))
         }
     }
 
@@ -621,10 +611,6 @@ where
     }
 }
 
-fn same_dir(a: &Dir, b: &Dir) -> io::Result<bool> {
-    Ok(same_meta(&a.self_metadata()?, &b.self_metadata()?))
-}
-
 #[inline]
 fn same_meta(a: &Metadata, b: &Metadata) -> bool {
     util::samestat(a.stat(), b.stat())
@@ -693,6 +679,10 @@ fn prepare_inner_operation<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn same_dir(a: &Dir, b: &Dir) -> io::Result<bool> {
+        Ok(same_meta(&a.self_metadata()?, &b.self_metadata()?))
+    }
 
     #[test]
     fn test_prepare_inner_operation() {
