@@ -139,10 +139,24 @@ impl Dir {
             let fd = subdir.as_ref().unwrap_or(self).as_raw_fd();
 
             match util::unlinkat(fd, &cstr(fname)?, true) {
-                Err(e) if e.raw_os_error() == Some(libc::EEXIST) => {
-                    Err(io::Error::from_raw_os_error(libc::ENOTEMPTY))
+                Err(e) => {
+                    #[cfg(not(any(
+                        target_os = "linux",
+                        target_os = "android",
+                        target_os = "freebsd",
+                        target_os = "dragonfly",
+                        target_os = "openbsd",
+                        target_os = "netbsd",
+                        target_os = "macos",
+                        target_os = "ios"
+                    )))]
+                    if e.raw_os_error() == Some(libc::EEXIST) {
+                        return Err(io::Error::from_raw_os_error(libc::ENOTEMPTY));
+                    }
+
+                    Err(e)
                 }
-                res => res,
+                Ok(()) => Ok(()),
             }
         } else {
             Err(std::io::Error::from_raw_os_error(libc::EBUSY))
