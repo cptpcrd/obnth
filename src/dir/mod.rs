@@ -34,7 +34,7 @@ bitflags::bitflags! {
         /// Create a "whiteout" object at the source of the rename while performing the rename.
         /// Useful for overlay/union filesystems.
         ///
-        /// Requires CAP_MKNOD.
+        /// Added in Linux 3.18. Requires CAP_MKNOD.
         const WHITEOUT = libc::RENAME_WHITEOUT;
     }
 }
