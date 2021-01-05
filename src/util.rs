@@ -1,4 +1,4 @@
-use std::ffi;
+use std::ffi::{CStr, OsStr, OsString};
 use std::fs;
 use std::io;
 use std::os::unix::prelude::*;
@@ -16,9 +16,9 @@ pub use libc::__errno as errno_ptr;
 #[cfg(target_os = "linux")]
 pub fn renameat2(
     old_dfd: RawFd,
-    old_path: &ffi::CStr,
+    old_path: &CStr,
     new_dfd: RawFd,
-    new_path: &ffi::CStr,
+    new_path: &CStr,
     flags: libc::c_int,
 ) -> io::Result<()> {
     if unsafe {
@@ -50,7 +50,7 @@ pub fn fstat(fd: RawFd) -> io::Result<libc::stat> {
 }
 
 #[inline]
-pub fn fstatat(fd: RawFd, path: &ffi::CStr, flags: libc::c_int) -> io::Result<libc::stat> {
+pub fn fstatat(fd: RawFd, path: &CStr, flags: libc::c_int) -> io::Result<libc::stat> {
     let mut stat = unsafe { std::mem::zeroed() };
 
     if unsafe { libc::fstatat(fd, path.as_ptr(), &mut stat, flags) } < 0 {
@@ -79,7 +79,7 @@ pub fn dup(fd: RawFd) -> io::Result<RawFd> {
 #[inline]
 pub fn openat_raw(
     dir_fd: RawFd,
-    path: &ffi::CStr,
+    path: &CStr,
     flags: libc::c_int,
     mode: libc::mode_t,
 ) -> io::Result<RawFd> {
@@ -102,14 +102,14 @@ pub fn openat_raw(
 #[inline]
 pub fn openat(
     dir_fd: RawFd,
-    path: &ffi::CStr,
+    path: &CStr,
     flags: libc::c_int,
     mode: libc::mode_t,
 ) -> io::Result<fs::File> {
     Ok(unsafe { fs::File::from_raw_fd(openat_raw(dir_fd, path, flags, mode)?) })
 }
 
-pub fn readlinkat(dir_fd: RawFd, path: &ffi::CStr) -> io::Result<PathBuf> {
+pub fn readlinkat(dir_fd: RawFd, path: &CStr) -> io::Result<PathBuf> {
     let mut buf = [0u8; libc::PATH_MAX as usize];
 
     if unsafe {
@@ -128,11 +128,11 @@ pub fn readlinkat(dir_fd: RawFd, path: &ffi::CStr) -> io::Result<PathBuf> {
             .position(|c| *c == 0)
             .unwrap_or_else(|| buf.len());
 
-        Ok(PathBuf::from(ffi::OsString::from_vec(buf[..len].into())))
+        Ok(PathBuf::from(OsString::from_vec(buf[..len].into())))
     }
 }
 
-pub fn mkdirat(dir_fd: RawFd, path: &ffi::CStr, mode: libc::mode_t) -> io::Result<()> {
+pub fn mkdirat(dir_fd: RawFd, path: &CStr, mode: libc::mode_t) -> io::Result<()> {
     if unsafe { libc::mkdirat(dir_fd, path.as_ptr(), mode) } < 0 {
         Err(io::Error::last_os_error())
     } else {
@@ -140,7 +140,7 @@ pub fn mkdirat(dir_fd: RawFd, path: &ffi::CStr, mode: libc::mode_t) -> io::Resul
     }
 }
 
-pub fn unlinkat(dir_fd: RawFd, path: &ffi::CStr, dir: bool) -> io::Result<()> {
+pub fn unlinkat(dir_fd: RawFd, path: &CStr, dir: bool) -> io::Result<()> {
     if unsafe {
         libc::unlinkat(
             dir_fd,
@@ -155,7 +155,7 @@ pub fn unlinkat(dir_fd: RawFd, path: &ffi::CStr, dir: bool) -> io::Result<()> {
     }
 }
 
-pub fn symlinkat(target: &ffi::CStr, dir_fd: RawFd, path: &ffi::CStr) -> io::Result<()> {
+pub fn symlinkat(target: &CStr, dir_fd: RawFd, path: &CStr) -> io::Result<()> {
     if unsafe { libc::symlinkat(target.as_ptr(), dir_fd, path.as_ptr()) } < 0 {
         Err(io::Error::last_os_error())
     } else {
@@ -165,9 +165,9 @@ pub fn symlinkat(target: &ffi::CStr, dir_fd: RawFd, path: &ffi::CStr) -> io::Res
 
 pub fn linkat(
     old_dfd: RawFd,
-    old_path: &ffi::CStr,
+    old_path: &CStr,
     new_dfd: RawFd,
-    new_path: &ffi::CStr,
+    new_path: &CStr,
     flags: libc::c_int,
 ) -> io::Result<()> {
     if unsafe {
@@ -188,9 +188,9 @@ pub fn linkat(
 
 pub fn renameat(
     old_dfd: RawFd,
-    old_path: &ffi::CStr,
+    old_path: &CStr,
     new_dfd: RawFd,
-    new_path: &ffi::CStr,
+    new_path: &CStr,
 ) -> io::Result<()> {
     if unsafe { libc::renameat(old_dfd, old_path.as_ptr(), new_dfd, new_path.as_ptr()) } < 0 {
         Err(io::Error::last_os_error())
@@ -212,7 +212,7 @@ pub fn get_symloop_max() -> Option<u16> {
     }
 }
 
-pub fn path_basename(path: &Path) -> Option<&ffi::OsStr> {
+pub fn path_basename(path: &Path) -> Option<&OsStr> {
     // This is equivalent to path.file_name(), except it leaves trailing slashes in place.
 
     if path == Path::new("/") || path.ends_with("..") {
@@ -233,7 +233,7 @@ pub fn path_basename(path: &Path) -> Option<&ffi::OsStr> {
         None => 0,
     };
 
-    Some(ffi::OsStr::from_bytes(&bytes[start_index..]))
+    Some(OsStr::from_bytes(&bytes[start_index..]))
 }
 
 #[cfg(test)]
@@ -244,7 +244,7 @@ mod tests {
     fn test_ebadf_errors() {
         assert_eq!(fstat(-1).unwrap_err().raw_os_error(), Some(libc::EBADF));
         assert_eq!(
-            fstatat(-1, &ffi::CStr::from_bytes_with_nul(b"dir\0").unwrap(), 0)
+            fstatat(-1, &CStr::from_bytes_with_nul(b"dir\0").unwrap(), 0)
                 .unwrap_err()
                 .raw_os_error(),
             Some(libc::EBADF)
@@ -260,7 +260,7 @@ mod tests {
         let tmpdir_file = fs::File::open(tmpdir).unwrap();
         let tmpdir_fd = tmpdir_file.as_raw_fd();
 
-        let name = ffi::CStr::from_bytes_with_nul(b"dir\0").unwrap();
+        let name = CStr::from_bytes_with_nul(b"dir\0").unwrap();
 
         mkdirat(tmpdir_fd, name, 0o777).unwrap();
         assert_eq!(
@@ -293,7 +293,7 @@ mod tests {
 
         fs::File::create(tmpdir.join("file")).unwrap();
 
-        let name = ffi::CStr::from_bytes_with_nul(b"file\0").unwrap();
+        let name = CStr::from_bytes_with_nul(b"file\0").unwrap();
 
         assert_eq!(
             unlinkat(tmpdir_fd, name, true).unwrap_err().raw_os_error(),
@@ -312,19 +312,13 @@ mod tests {
             assert_eq!(path_basename(Path::new(path)), None);
         }
 
-        assert_eq!(path_basename(Path::new("a")), Some(ffi::OsStr::new("a")));
-        assert_eq!(path_basename(Path::new("a/")), Some(ffi::OsStr::new("a/")));
-        assert_eq!(path_basename(Path::new("a//")), Some(ffi::OsStr::new("a/")));
+        assert_eq!(path_basename(Path::new("a")), Some(OsStr::new("a")));
+        assert_eq!(path_basename(Path::new("a/")), Some(OsStr::new("a/")));
+        assert_eq!(path_basename(Path::new("a//")), Some(OsStr::new("a/")));
 
-        assert_eq!(path_basename(Path::new("a/b")), Some(ffi::OsStr::new("b")));
-        assert_eq!(
-            path_basename(Path::new("a/b/")),
-            Some(ffi::OsStr::new("b/"))
-        );
-        assert_eq!(
-            path_basename(Path::new("a/b//")),
-            Some(ffi::OsStr::new("b/"))
-        );
+        assert_eq!(path_basename(Path::new("a/b")), Some(OsStr::new("b")));
+        assert_eq!(path_basename(Path::new("a/b/")), Some(OsStr::new("b/")));
+        assert_eq!(path_basename(Path::new("a/b//")), Some(OsStr::new("b/")));
     }
 
     #[test]
