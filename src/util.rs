@@ -212,9 +212,7 @@ pub fn get_symloop_max() -> Option<u16> {
     }
 }
 
-pub fn path_basename(path: &Path) -> Option<&OsStr> {
-    // This is equivalent to path.file_name(), except it leaves trailing slashes in place.
-
+pub fn path_split(path: &Path) -> Option<(Option<&OsStr>, &OsStr)> {
     if path == Path::new("/") || path.ends_with("..") {
         return None;
     }
@@ -227,13 +225,16 @@ pub fn path_basename(path: &Path) -> Option<&OsStr> {
         bytes = &bytes[..bytes.len() - 1];
     }
 
-    // Now find the last trailing slash that isn't at the end
-    let start_index = match bytes.iter().take(bytes.len() - 1).rposition(|&c| c == b'/') {
-        Some(i) => i + 1,
-        None => 0,
-    };
-
-    Some(OsStr::from_bytes(&bytes[start_index..]))
+    // Now find the last slash that isn't at the end
+    Some(
+        match bytes.iter().take(bytes.len() - 1).rposition(|&c| c == b'/') {
+            Some(i) => (
+                Some(OsStr::from_bytes(&bytes[..i + 1])),
+                OsStr::from_bytes(&bytes[i + 1..]),
+            ),
+            None => (None, OsStr::from_bytes(bytes)),
+        },
+    )
 }
 
 #[cfg(test)]
@@ -307,18 +308,54 @@ mod tests {
     }
 
     #[test]
-    fn test_path_basename() {
+    fn test_path_split() {
         for path in ["/", "//", "..", "a/.."].iter() {
-            assert_eq!(path_basename(Path::new(path)), None);
+            assert_eq!(path_split(Path::new(path)), None);
         }
 
-        assert_eq!(path_basename(Path::new("a")), Some(OsStr::new("a")));
-        assert_eq!(path_basename(Path::new("a/")), Some(OsStr::new("a/")));
-        assert_eq!(path_basename(Path::new("a//")), Some(OsStr::new("a/")));
+        assert_eq!(path_split(Path::new("a")), Some((None, OsStr::new("a"))));
+        assert_eq!(path_split(Path::new("a/")), Some((None, OsStr::new("a/"))));
+        assert_eq!(path_split(Path::new("a//")), Some((None, OsStr::new("a/"))));
 
-        assert_eq!(path_basename(Path::new("a/b")), Some(OsStr::new("b")));
-        assert_eq!(path_basename(Path::new("a/b/")), Some(OsStr::new("b/")));
-        assert_eq!(path_basename(Path::new("a/b//")), Some(OsStr::new("b/")));
+        assert_eq!(
+            path_split(Path::new("a/b")),
+            Some((Some(OsStr::new("a/")), OsStr::new("b")))
+        );
+        assert_eq!(
+            path_split(Path::new("a/b/")),
+            Some((Some(OsStr::new("a/")), OsStr::new("b/")))
+        );
+        assert_eq!(
+            path_split(Path::new("a/b//")),
+            Some((Some(OsStr::new("a/")), OsStr::new("b/")))
+        );
+        assert_eq!(
+            path_split(Path::new("/a//b//")),
+            Some((Some(OsStr::new("/a//")), OsStr::new("b/")))
+        );
+        assert_eq!(
+            path_split(Path::new("/a")),
+            Some((Some(OsStr::new("/")), OsStr::new("a")))
+        );
+
+        assert_eq!(
+            path_split(Path::new("/a/.")),
+            Some((Some(OsStr::new("/a/")), OsStr::new(".")))
+        );
+
+        assert_eq!(
+            path_split(Path::new("/a/b/./")),
+            Some((Some(OsStr::new("/a/b/")), OsStr::new("./")))
+        );
+
+        assert_eq!(
+            path_split(Path::new("a/b/c")),
+            Some((Some(OsStr::new("a/b/")), OsStr::new("c")))
+        );
+        assert_eq!(
+            path_split(Path::new("a/b/c//")),
+            Some((Some(OsStr::new("a/b/")), OsStr::new("c/")))
+        );
     }
 
     #[test]

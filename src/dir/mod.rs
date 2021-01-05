@@ -663,23 +663,20 @@ fn prepare_inner_operation<'a>(
     debug_assert!(!path.as_os_str().as_bytes().is_empty());
     debug_assert!(!path.as_os_str().as_bytes().starts_with(b"/"));
 
-    if let Some(fname) = util::path_basename(path) {
+    if let Some((parent, fname)) = util::path_split(path) {
         debug_assert!(!path.ends_with(".."));
 
-        let fname = match fname.as_bytes() {
-            b"." | b"./" => None,
-            _ => Some(fname),
-        };
-
-        // Because of the conditions listed above, path.parent() should never be None
-        let parent = path.parent().unwrap();
-
-        if parent.as_os_str().is_empty() {
-            // Though it might be empty, in which case we just reuse the existing directory
-            Ok((None, fname))
-        } else {
-            Ok((Some(dir.sub_dir(parent, lookup_flags)?), fname))
-        }
+        Ok((
+            if let Some(parent) = parent {
+                Some(dir.sub_dir(parent, lookup_flags)?)
+            } else {
+                None
+            },
+            match fname.as_bytes() {
+                b"." | b"./" => None,
+                _ => Some(fname),
+            },
+        ))
     } else {
         debug_assert!(path.ends_with(".."));
 
@@ -705,13 +702,19 @@ mod tests {
         let tmpdir = Dir::open(tmpdir_path).unwrap();
 
         tmpdir.create_dir("a", 0o777, LookupFlags::empty()).unwrap();
+        tmpdir
+            .create_dir("a/b", 0o777, LookupFlags::empty())
+            .unwrap();
 
         for (path, lookup_flags, expect_dname, expect_fname) in [
             ("/", LookupFlags::IN_ROOT, None, None),
             (".", LookupFlags::empty(), None, None),
             ("a", LookupFlags::empty(), None, Some("a")),
             ("a/", LookupFlags::empty(), None, Some("a/")),
+            ("a/.", LookupFlags::empty(), Some("a"), None),
             ("a/b", LookupFlags::empty(), Some("a"), Some("b")),
+            ("a/b/.", LookupFlags::empty(), Some("a/b"), None),
+            ("a/b/c", LookupFlags::empty(), Some("a/b"), Some("c")),
             ("a/..", LookupFlags::empty(), Some("."), None),
             ("/..", LookupFlags::IN_ROOT, Some("."), None),
         ]
