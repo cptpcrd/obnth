@@ -348,7 +348,7 @@ impl Dir {
         {
             let mut buf = [0u8; libc::PATH_MAX as usize];
 
-            if unsafe { libc::fcntl(self.fd, libc::F_GETPATH, &mut buf) } == 0 {
+            if unsafe { libc::fcntl(self.fd, libc::F_GETPATH, buf.as_mut_ptr()) } == 0 {
                 let index = buf.iter().position(|&c| c == 0).unwrap();
 
                 let c_path = unsafe { CStr::from_bytes_with_nul_unchecked(&buf[..index + 1]) };
