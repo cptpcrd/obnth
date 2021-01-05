@@ -176,13 +176,15 @@ fn open_beneath_openat2(
 
 fn map_component_cstring(component: Component) -> io::Result<Cow<CStr>> {
     Ok(match component {
-        Component::CurDir => Cow::Borrowed(unsafe { CStr::from_bytes_with_nul_unchecked(b".\0") }),
         Component::RootDir => Cow::Borrowed(unsafe { CStr::from_bytes_with_nul_unchecked(b"/\0") }),
         Component::ParentDir => {
             Cow::Borrowed(unsafe { CStr::from_bytes_with_nul_unchecked(b"..\0") })
         }
 
         Component::Normal(fname) => Cow::Owned(CString::new(fname.as_bytes())?),
+
+        // Filtered out earlier
+        Component::CurDir => unreachable!(),
 
         // This is a Unix-only crate
         Component::Prefix(_) => unreachable!(),
@@ -203,7 +205,10 @@ fn split_path(
 
     let mut queue = VecDeque::new();
 
-    let mut it = path.components().peekable();
+    let mut it = path
+        .components()
+        .filter(|c| !matches!(c, Component::CurDir))
+        .peekable();
     while let Some(component) = it.next() {
         let component_flags = if it.peek().is_some() {
             constants::DIR_OPEN_FLAGS
@@ -230,7 +235,12 @@ fn split_link_path_into(
         flags |= libc::O_DIRECTORY;
     }
 
-    for (i, component) in path.components().rev().enumerate() {
+    for (i, component) in path
+        .components()
+        .filter(|c| !matches!(c, Component::CurDir))
+        .rev()
+        .enumerate()
+    {
         let component_flags = if i == 0 {
             flags
         } else {
@@ -374,8 +384,6 @@ fn do_open_beneath(
                     saw_parent_elem = true;
                 }
             }
-
-            b"." => (),
 
             _ => {
                 if saw_parent_elem {
@@ -523,10 +531,6 @@ mod tests {
             split_path("./abc/./../def/".as_ref(), libc::O_RDONLY).unwrap(),
             &[
                 (
-                    Cow::Owned(CString::new(".").unwrap()),
-                    constants::DIR_OPEN_FLAGS
-                ),
-                (
                     Cow::Owned(CString::new("abc").unwrap()),
                     constants::DIR_OPEN_FLAGS
                 ),
@@ -604,10 +608,6 @@ mod tests {
         assert_eq!(
             parts,
             &[
-                (
-                    Cow::Owned(CString::new(".").unwrap()),
-                    constants::DIR_OPEN_FLAGS
-                ),
                 (
                     Cow::Owned(CString::new("abc").unwrap()),
                     constants::DIR_OPEN_FLAGS
