@@ -76,7 +76,7 @@ fn test_open_beneath_success() {
     ]
     .iter()
     {
-        let f = open_beneath(tmpdir_fd, path, *flags, 0o666, *lookup_flags).unwrap();
+        let f = open_beneath(tmpdir_fd, *path, *flags, 0o666, *lookup_flags).unwrap();
 
         assert!(same_file_meta(&f, &tmpdir.join(same_path).symlink_metadata().unwrap()).unwrap());
     }
@@ -194,7 +194,7 @@ fn test_open_beneath_error() {
     .iter()
     {
         assert_eq!(
-            open_beneath(tmpdir_fd, path, *flags, 0o666, *lookup_flags)
+            open_beneath(tmpdir_fd, *path, *flags, 0o666, *lookup_flags)
                 .unwrap_err()
                 .raw_os_error(),
             Some(*eno)

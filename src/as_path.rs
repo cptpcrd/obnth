@@ -1,7 +1,7 @@
-use std::ffi::{CStr, CString, OsStr};
+use std::ffi::{CStr, CString, OsStr, OsString};
 use std::io;
 use std::os::unix::prelude::*;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Represents a string that can be cheaply re-cast as a `Path`, and possibly also as a `CStr`.
 ///
@@ -29,27 +29,40 @@ pub trait AsPath {
     }
 }
 
-impl<T> AsPath for T
-where
-    T: AsRef<Path>,
-{
-    #[inline]
-    fn as_path(&self) -> &Path {
-        self.as_ref()
-    }
+macro_rules! asref_impl {
+    ($($type:ty)*) => {
+        $(
+            impl AsPath for $type {
+                #[inline]
+                fn as_path(&self) -> &Path {
+                    self.as_ref()
+                }
+            }
+        )*
+    };
 }
 
-impl AsPath for CStr {
-    #[inline]
-    fn as_path(&self) -> &Path {
-        OsStr::from_bytes(self.to_bytes()).as_ref()
-    }
+macro_rules! cstr_impl {
+    ($($type:ty)*) => {
+        $(
+            impl AsPath for $type {
+                #[inline]
+                fn as_path(&self) -> &Path {
+                    OsStr::from_bytes(self.to_bytes()).as_ref()
+                }
 
-    #[inline]
-    fn with_cstr<T, F: FnMut(&CStr) -> io::Result<T>>(&self, mut f: F) -> io::Result<T> {
-        f(self)
-    }
+                #[inline]
+                fn with_cstr<T, F: FnMut(&CStr) -> io::Result<T>>(&self, mut f: F) -> io::Result<T> {
+                    f(self)
+                }
+            }
+        )*
+    };
 }
+
+asref_impl! { &Path PathBuf &PathBuf &str String &String &OsStr OsString &OsString }
+
+cstr_impl! { &CStr CString &CString }
 
 #[cfg(test)]
 mod tests {
@@ -119,5 +132,24 @@ mod tests {
                 Ok(())
             })
             .unwrap();
+    }
+
+    #[test]
+    fn test_as_path_arg() {
+        fn do_it<P: AsPath>(p: P) {
+            p.as_path();
+        }
+
+        do_it("");
+        do_it(String::new());
+        do_it(&String::new());
+
+        do_it(OsStr::new(""));
+        do_it(OsString::from(""));
+        do_it(&OsString::from(""));
+
+        do_it(CStr::from_bytes_with_nul(b"\0").unwrap());
+        do_it(CString::new("").unwrap());
+        do_it(&CString::new("").unwrap());
     }
 }

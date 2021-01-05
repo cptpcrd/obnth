@@ -56,7 +56,7 @@ fn test_create_remove_dir() {
     {
         assert_eq!(
             tmpdir
-                .create_dir(path, 0o777, *lookup_flags)
+                .create_dir(*path, 0o777, *lookup_flags)
                 .unwrap_err()
                 .raw_os_error(),
             Some(*eno)
@@ -74,7 +74,7 @@ fn test_create_remove_dir() {
     {
         assert_eq!(
             tmpdir
-                .remove_dir(path, *lookup_flags)
+                .remove_dir(*path, *lookup_flags)
                 .unwrap_err()
                 .raw_os_error(),
             Some(*eno)
@@ -175,7 +175,7 @@ fn test_remove_file() {
     .iter()
     {
         let eno = tmpdir
-            .remove_file(path, *lookup_flags)
+            .remove_file(*path, *lookup_flags)
             .unwrap_err()
             .raw_os_error()
             .unwrap();
@@ -220,7 +220,7 @@ fn test_symlinks() {
     {
         assert_eq!(
             tmpdir
-                .symlink(path, "target", *lookup_flags)
+                .symlink(*path, "target", *lookup_flags)
                 .unwrap_err()
                 .raw_os_error(),
             Some(*eno)
@@ -262,7 +262,7 @@ fn test_symlinks() {
     {
         assert_eq!(
             tmpdir
-                .read_link(path, *lookup_flags)
+                .read_link(*path, *lookup_flags)
                 .unwrap_err()
                 .raw_os_error(),
             Some(*eno),

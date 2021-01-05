@@ -718,7 +718,7 @@ mod tests {
 
             if let Some(expect_dname) = expect_dname {
                 assert!(same_dir(
-                    &tmpdir.sub_dir(expect_dname, LookupFlags::empty()).unwrap(),
+                    &tmpdir.sub_dir(*expect_dname, LookupFlags::empty()).unwrap(),
                     subdir.as_ref().unwrap()
                 )
                 .unwrap());
@@ -767,7 +767,7 @@ mod tests {
     #[test]
     fn test_try_clone() {
         for path in [".", "/"].iter() {
-            let dir = Dir::open(path).unwrap();
+            let dir = Dir::open(*path).unwrap();
             assert!(same_dir(&dir, &dir.try_clone().unwrap()).unwrap());
         }
     }
