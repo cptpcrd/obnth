@@ -27,6 +27,7 @@ fn test_open_beneath_success() {
     std::os::unix::fs::symlink("a/", tmpdir.join("e")).unwrap();
     std::os::unix::fs::symlink("/", tmpdir.join("f")).unwrap();
     std::os::unix::fs::symlink("./b", tmpdir.join("a/g")).unwrap();
+    std::os::unix::fs::symlink(".", tmpdir.join("a/h")).unwrap();
 
     for (path, flags, lookup_flags, same_path) in [
         (
@@ -67,6 +68,7 @@ fn test_open_beneath_success() {
         ("d", libc::O_WRONLY, LookupFlags::IN_ROOT, "a/b"),
         ("f", libc::O_RDONLY, LookupFlags::IN_ROOT, "."),
         ("a/g", libc::O_RDONLY, LookupFlags::IN_ROOT, "a/b"),
+        ("a/h", libc::O_RDONLY, LookupFlags::IN_ROOT, "a"),
         ("a/..", libc::O_RDONLY, LookupFlags::IN_ROOT, "."),
         ("a/../..", libc::O_RDONLY, LookupFlags::IN_ROOT, "."),
         ("../../", libc::O_RDONLY, LookupFlags::IN_ROOT, "."),
@@ -111,6 +113,8 @@ fn test_open_beneath_error() {
     std::os::unix::fs::symlink("/a/b", tmpdir.join("d")).unwrap();
     std::os::unix::fs::symlink("a/", tmpdir.join("e")).unwrap();
     std::os::unix::fs::symlink("/", tmpdir.join("f")).unwrap();
+    std::os::unix::fs::symlink("./b", tmpdir.join("a/g")).unwrap();
+    std::os::unix::fs::symlink(".", tmpdir.join("a/h")).unwrap();
 
     std::os::unix::fs::symlink("loop", tmpdir.join("loop")).unwrap();
 
@@ -174,6 +178,7 @@ fn test_open_beneath_error() {
         ("d", libc::O_RDONLY, LookupFlags::empty(), libc::EXDEV),
         ("e", libc::O_WRONLY, LookupFlags::empty(), libc::EISDIR),
         ("f", libc::O_RDONLY, LookupFlags::empty(), libc::EXDEV),
+        ("a/h", libc::O_WRONLY, LookupFlags::empty(), libc::EISDIR),
         ("..", libc::O_RDONLY, LookupFlags::empty(), libc::EXDEV),
         ("", libc::O_RDONLY, LookupFlags::empty(), libc::ENOENT),
         ("/", libc::O_RDONLY, LookupFlags::empty(), libc::EXDEV),

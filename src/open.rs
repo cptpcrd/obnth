@@ -463,6 +463,26 @@ fn do_open_beneath(
                         }
 
                         split_link_path_into(&target, flags, &mut parts)?;
+
+                        if parts.is_empty() {
+                            // We remove CurDir elements when splitting the paths. This has the
+                            // consequence that if the last element in the path is a symbolic link
+                            // pointing to ".", nothing will get added to `parts` with the
+                            // corresponding flags, so `orig_flags` will not be properly honored
+                            // (just opened with DIR_OPEN_FLAGS).
+                            // It's an edge case, but it could happen.
+
+                            debug_assert_eq!(target, Path::new("."));
+                            debug_assert_eq!(flags, orig_flags);
+                            debug_assert!(!saw_parent_elem);
+
+                            return util::openat(
+                                cur_fd,
+                                unsafe { CStr::from_bytes_with_nul_unchecked(b".\0") },
+                                orig_flags,
+                                mode,
+                            );
+                        }
                     }
                 }
             }
