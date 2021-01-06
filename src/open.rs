@@ -115,17 +115,16 @@ fn open_beneath_openat2(
         return Err(io::Error::from_raw_os_error(libc::EBADF));
     }
 
-    flags |= libc::O_NOCTTY;
+    flags |= libc::O_NOCTTY | libc::O_CLOEXEC;
 
     if flags & libc::O_PATH == libc::O_PATH {
         // If we have O_PATH, throw out everything except the O_PATH and the flags that work with
         // it.
-        // O_CLOEXEC is missing from this list; we add it in below.
-        flags &= libc::O_PATH | libc::O_DIRECTORY | libc::O_NOFOLLOW;
+        flags &= libc::O_PATH | libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC;
     }
 
     let mut how = sys::open_how {
-        flags: (flags | libc::O_CLOEXEC) as u64,
+        flags: flags as u64,
         mode: 0,
         resolve: sys::ResolveFlags::NO_MAGICLINKS,
     };
