@@ -22,6 +22,20 @@ fn test_open_beneath_success() {
     fs::File::create(tmpdir.join("a/b")).unwrap();
     fs::create_dir(tmpdir.join("a/sub")).unwrap();
 
+    macro_rules! check_ok {
+        ($path:expr, $flags:expr, $lookup_flags:expr, $same_path:expr $(,)?) => {
+            let f = open_beneath(tmpdir_fd, $path, $flags, 0o666, $lookup_flags).unwrap();
+
+            assert!(
+                same_file_meta(&f, &tmpdir.join($same_path).symlink_metadata().unwrap()).unwrap()
+            );
+        };
+
+        ($path:expr, $flags:expr, $same_path:expr $(,)?) => {
+            check_ok!($path, $flags, LookupFlags::empty(), $same_path)
+        };
+    }
+
     std::os::unix::fs::symlink("a/b", tmpdir.join("c")).unwrap();
     std::os::unix::fs::symlink("/a/b", tmpdir.join("d")).unwrap();
     std::os::unix::fs::symlink("a/", tmpdir.join("e")).unwrap();
@@ -29,58 +43,41 @@ fn test_open_beneath_success() {
     std::os::unix::fs::symlink("./b", tmpdir.join("a/g")).unwrap();
     std::os::unix::fs::symlink(".", tmpdir.join("a/h")).unwrap();
 
-    for (path, flags, lookup_flags, same_path) in [
-        (
-            "a",
-            libc::O_RDONLY | libc::O_DIRECTORY,
-            LookupFlags::empty(),
-            "a",
-        ),
-        #[cfg(any(target_os = "linux", target_os = "android"))]
-        ("a", libc::O_PATH, LookupFlags::empty(), "a"),
-        #[cfg(any(target_os = "linux", target_os = "android"))]
-        (
-            "a",
-            libc::O_PATH | libc::O_NOFOLLOW,
-            LookupFlags::empty(),
-            "a",
-        ),
-        ("a/b", libc::O_RDONLY, LookupFlags::empty(), "a/b"),
-        ("a/../a", libc::O_RDONLY, LookupFlags::empty(), "a"),
-        ("a/../a/b", libc::O_RDONLY, LookupFlags::empty(), "a/b"),
-        ("a/sub/..", libc::O_RDONLY, LookupFlags::empty(), "a"),
-        ("a/sub/../..", libc::O_RDONLY, LookupFlags::empty(), "."),
-        ("e", libc::O_RDONLY, LookupFlags::IN_ROOT, "a"),
-        ("a/b", libc::O_WRONLY, LookupFlags::empty(), "a/b"),
-        ("c", libc::O_WRONLY, LookupFlags::empty(), "a/b"),
-        #[cfg(any(target_os = "linux", target_os = "android"))]
-        ("c", libc::O_PATH, LookupFlags::empty(), "a/b"),
-        #[cfg(any(target_os = "linux", target_os = "android"))]
-        (
-            "c",
-            libc::O_PATH | libc::O_NOFOLLOW,
-            LookupFlags::empty(),
-            "c",
-        ),
-        (".", libc::O_RDONLY, LookupFlags::empty(), "."),
-        ("./", libc::O_RDONLY, LookupFlags::empty(), "."),
-        ("c", libc::O_WRONLY, LookupFlags::IN_ROOT, "a/b"),
-        ("d", libc::O_WRONLY, LookupFlags::IN_ROOT, "a/b"),
-        ("f", libc::O_RDONLY, LookupFlags::IN_ROOT, "."),
-        ("a/g", libc::O_RDONLY, LookupFlags::IN_ROOT, "a/b"),
-        ("a/h", libc::O_RDONLY, LookupFlags::IN_ROOT, "a"),
-        ("a/..", libc::O_RDONLY, LookupFlags::IN_ROOT, "."),
-        ("a/../..", libc::O_RDONLY, LookupFlags::IN_ROOT, "."),
-        ("../../", libc::O_RDONLY, LookupFlags::IN_ROOT, "."),
-        ("/a/../..", libc::O_RDONLY, LookupFlags::IN_ROOT, "."),
-        ("/../../", libc::O_RDONLY, LookupFlags::IN_ROOT, "."),
-        ("/", libc::O_RDONLY, LookupFlags::IN_ROOT, "."),
-    ]
-    .iter()
-    {
-        let f = open_beneath(tmpdir_fd, *path, *flags, 0o666, *lookup_flags).unwrap();
+    check_ok!("a", libc::O_RDONLY | libc::O_DIRECTORY, "a");
+    check_ok!("a/b", libc::O_RDONLY, "a/b");
+    check_ok!("a/../a", libc::O_RDONLY, "a");
+    check_ok!("a/../a/b", libc::O_RDONLY, "a/b");
+    check_ok!("a/sub/..", libc::O_RDONLY, "a");
+    check_ok!("a/sub/../..", libc::O_RDONLY, ".");
 
-        assert!(same_file_meta(&f, &tmpdir.join(same_path).symlink_metadata().unwrap()).unwrap());
+    check_ok!("e", libc::O_RDONLY, LookupFlags::IN_ROOT, "a");
+    check_ok!("a/b", libc::O_WRONLY, "a/b");
+    check_ok!("c", libc::O_WRONLY, "a/b");
+
+    check_ok!(".", libc::O_RDONLY, ".");
+    check_ok!("./", libc::O_RDONLY, ".");
+    check_ok!("/", libc::O_RDONLY, LookupFlags::IN_ROOT, ".");
+
+    check_ok!("c", libc::O_WRONLY, LookupFlags::IN_ROOT, "a/b");
+    check_ok!("d", libc::O_WRONLY, LookupFlags::IN_ROOT, "a/b");
+    check_ok!("f", libc::O_RDONLY, LookupFlags::IN_ROOT, ".");
+
+    check_ok!("a/g", libc::O_RDONLY, LookupFlags::IN_ROOT, "a/b");
+    check_ok!("a/h", libc::O_RDONLY, LookupFlags::IN_ROOT, "a");
+    check_ok!("a/..", libc::O_RDONLY, LookupFlags::IN_ROOT, ".");
+    check_ok!("a/../..", libc::O_RDONLY, LookupFlags::IN_ROOT, ".");
+    check_ok!("/a/../../", libc::O_RDONLY, LookupFlags::IN_ROOT, ".");
+    check_ok!("../..", libc::O_RDONLY, LookupFlags::IN_ROOT, ".");
+    check_ok!("../../", libc::O_RDONLY, LookupFlags::IN_ROOT, ".");
+    check_ok!("/../../", libc::O_RDONLY, LookupFlags::IN_ROOT, ".");
+
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    {
+        check_ok!("a", libc::O_PATH, "a");
+        check_ok!("a", libc::O_PATH | libc::O_NOFOLLOW, "a");
+
+        check_ok!("c", libc::O_PATH, "a/b");
+        check_ok!("c", libc::O_PATH | libc::O_NOFOLLOW, "c");
     }
 
     open_beneath(
@@ -144,67 +141,52 @@ fn test_open_beneath_error() {
         Some(libc::ENOTDIR)
     );
 
-    for (path, flags, lookup_flags, eno) in [
-        (
-            "NOEXIST",
-            libc::O_RDONLY | libc::O_DIRECTORY,
-            LookupFlags::empty(),
-            libc::ENOENT,
-        ),
-        (
-            "a/b",
-            libc::O_RDONLY | libc::O_DIRECTORY,
-            LookupFlags::empty(),
-            libc::ENOTDIR,
-        ),
-        ("a/b/", libc::O_RDONLY, LookupFlags::empty(), libc::ENOTDIR),
-        ("a/b/.", libc::O_RDONLY, LookupFlags::empty(), libc::ENOTDIR),
-        ("c", libc::O_RDONLY, LookupFlags::NO_SYMLINKS, libc::ELOOP),
-        ("d", libc::O_RDONLY, LookupFlags::NO_SYMLINKS, libc::ELOOP),
-        (
-            "c",
-            libc::O_RDONLY | libc::O_NOFOLLOW,
-            LookupFlags::empty(),
-            libc::ELOOP,
-        ),
-        (
-            "d",
-            libc::O_RDONLY | libc::O_NOFOLLOW,
-            LookupFlags::empty(),
-            libc::ELOOP,
-        ),
-        ("e/b", libc::O_RDONLY, LookupFlags::NO_SYMLINKS, libc::ELOOP),
-        ("loop", libc::O_RDONLY, LookupFlags::empty(), libc::ELOOP),
-        ("d", libc::O_RDONLY, LookupFlags::empty(), libc::EXDEV),
-        ("e", libc::O_WRONLY, LookupFlags::empty(), libc::EISDIR),
-        ("f", libc::O_RDONLY, LookupFlags::empty(), libc::EXDEV),
-        ("a/h", libc::O_WRONLY, LookupFlags::empty(), libc::EISDIR),
-        ("..", libc::O_RDONLY, LookupFlags::empty(), libc::EXDEV),
-        ("", libc::O_RDONLY, LookupFlags::empty(), libc::ENOENT),
-        ("/", libc::O_RDONLY, LookupFlags::empty(), libc::EXDEV),
-        (
-            "a/../../a/b",
-            libc::O_RDONLY,
-            LookupFlags::empty(),
-            libc::EXDEV,
-        ),
-        ("a/../..", libc::O_RDONLY, LookupFlags::empty(), libc::EXDEV),
-        (
-            "a/sub/../../..",
-            libc::O_RDONLY,
-            LookupFlags::empty(),
-            libc::EXDEV,
-        ),
-    ]
-    .iter()
-    {
-        assert_eq!(
-            open_beneath(tmpdir_fd, *path, *flags, 0o666, *lookup_flags)
-                .unwrap_err()
-                .raw_os_error(),
-            Some(*eno)
-        );
+    macro_rules! check_err {
+        ($path:expr, $flags:expr, $lookup_flags:expr, $eno:expr $(,)?) => {
+            assert_eq!(
+                open_beneath(tmpdir_fd, $path, $flags, 0o666, $lookup_flags)
+                    .unwrap_err()
+                    .raw_os_error(),
+                Some($eno)
+            );
+        };
+
+        ($path:expr, $flags:expr, $eno:expr $(,)?) => {
+            check_err!($path, $flags, LookupFlags::empty(), $eno)
+        };
     }
+
+    check_err!("", libc::O_RDONLY, libc::ENOENT);
+
+    check_err!("NOEXIST", libc::O_RDONLY | libc::O_DIRECTORY, libc::ENOENT);
+    check_err!("a/b", libc::O_RDONLY | libc::O_DIRECTORY, libc::ENOTDIR);
+    check_err!("a/b/", libc::O_RDONLY, libc::ENOTDIR);
+    check_err!("a/b/.", libc::O_RDONLY, libc::ENOTDIR);
+    check_err!("a/b/./", libc::O_RDONLY, libc::ENOTDIR);
+
+    check_err!("c", libc::O_RDONLY, LookupFlags::NO_SYMLINKS, libc::ELOOP);
+    check_err!("d", libc::O_RDONLY, LookupFlags::NO_SYMLINKS, libc::ELOOP);
+    check_err!("c", libc::O_RDONLY | libc::O_NOFOLLOW, libc::ELOOP);
+    check_err!("d", libc::O_RDONLY | libc::O_NOFOLLOW, libc::ELOOP);
+
+    check_err!("e/b", libc::O_RDONLY, LookupFlags::NO_SYMLINKS, libc::ELOOP);
+    check_err!(
+        "loop",
+        libc::O_RDONLY,
+        LookupFlags::NO_SYMLINKS,
+        libc::ELOOP
+    );
+
+    check_err!("d", libc::O_RDONLY, libc::EXDEV);
+    check_err!("f", libc::O_RDONLY, libc::EXDEV);
+    check_err!("..", libc::O_RDONLY, libc::EXDEV);
+    check_err!("/", libc::O_RDONLY, libc::EXDEV);
+    check_err!("a/../../a/b", libc::O_RDONLY, libc::EXDEV);
+    check_err!("a/../..", libc::O_RDONLY, libc::EXDEV);
+    check_err!("a/sub/../../..", libc::O_RDONLY, libc::EXDEV);
+
+    check_err!("a/h", libc::O_WRONLY, libc::EISDIR);
+    check_err!("e", libc::O_WRONLY, libc::EISDIR);
 }
 
 #[test]

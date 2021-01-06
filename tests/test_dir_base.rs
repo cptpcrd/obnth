@@ -40,48 +40,57 @@ fn test_create_remove_dir() {
         .create_dir("dir/subdir", 0o777, LookupFlags::empty())
         .unwrap();
 
-    for (path, lookup_flags, eno) in [
-        ("dir", LookupFlags::empty(), libc::EEXIST),
-        ("dir/subdir", LookupFlags::empty(), libc::EEXIST),
-        (".", LookupFlags::empty(), libc::EEXIST),
-        ("./", LookupFlags::empty(), libc::EEXIST),
-        (".//", LookupFlags::empty(), libc::EEXIST),
-        ("/", LookupFlags::IN_ROOT, libc::EEXIST),
-        ("//", LookupFlags::IN_ROOT, libc::EEXIST),
-        ("..", LookupFlags::IN_ROOT, libc::EEXIST),
-        ("../", LookupFlags::IN_ROOT, libc::EEXIST),
-        ("dir/subdir/..", LookupFlags::empty(), libc::EEXIST),
-    ]
-    .iter()
-    {
-        assert_eq!(
-            tmpdir
-                .create_dir(*path, 0o777, *lookup_flags)
-                .unwrap_err()
-                .raw_os_error(),
-            Some(*eno)
-        );
+    macro_rules! check_err {
+        ($path:expr, $lookup_flags:expr, $eno:expr) => {
+            assert_eq!(
+                tmpdir
+                    .create_dir($path, 0o777, $lookup_flags)
+                    .unwrap_err()
+                    .raw_os_error(),
+                Some($eno)
+            )
+        };
+
+        ($path:expr, $eno:expr) => {
+            check_err!($path, LookupFlags::empty(), $eno)
+        };
     }
 
-    for (path, lookup_flags, eno) in [
-        (".", LookupFlags::empty(), libc::EBUSY),
-        ("/", LookupFlags::IN_ROOT, libc::EBUSY),
-        ("..", LookupFlags::IN_ROOT, libc::EBUSY),
-        ("dir", LookupFlags::empty(), libc::ENOTEMPTY),
-        ("dir/.", LookupFlags::empty(), libc::EBUSY),
-        ("dir/./", LookupFlags::empty(), libc::EBUSY),
-        ("dir/subdir/..", LookupFlags::empty(), libc::EBUSY),
-    ]
-    .iter()
-    {
-        assert_eq!(
-            tmpdir
-                .remove_dir(*path, *lookup_flags)
-                .unwrap_err()
-                .raw_os_error(),
-            Some(*eno)
-        );
+    check_err!("dir", libc::EEXIST);
+    check_err!("dir/subdir", libc::EEXIST);
+    check_err!(".", libc::EEXIST);
+    check_err!("./", libc::EEXIST);
+    check_err!(".//", libc::EEXIST);
+    check_err!("/", LookupFlags::IN_ROOT, libc::EEXIST);
+    check_err!("//", LookupFlags::IN_ROOT, libc::EEXIST);
+    check_err!("..", LookupFlags::IN_ROOT, libc::EEXIST);
+    check_err!("../", LookupFlags::IN_ROOT, libc::EEXIST);
+    check_err!("dir/subdir/..", LookupFlags::IN_ROOT, libc::EEXIST);
+
+    macro_rules! check_err {
+        ($path:expr, $lookup_flags:expr, $eno:expr) => {
+            assert_eq!(
+                tmpdir
+                    .remove_dir($path, $lookup_flags)
+                    .unwrap_err()
+                    .raw_os_error(),
+                Some($eno)
+            )
+        };
+
+        ($path:expr, $eno:expr) => {
+            check_err!($path, LookupFlags::empty(), $eno)
+        };
     }
+
+    check_err!(".", libc::EBUSY);
+    check_err!("/", LookupFlags::IN_ROOT, libc::EBUSY);
+    check_err!("..", LookupFlags::IN_ROOT, libc::EBUSY);
+    check_err!("dir", libc::ENOTEMPTY);
+    check_err!("dir/", libc::ENOTEMPTY);
+    check_err!("dir/.", libc::EBUSY);
+    check_err!("dir/./", libc::EBUSY);
+    check_err!("dir/subdir/..", libc::EBUSY);
 
     tmpdir
         .remove_dir("dir/subdir", LookupFlags::empty())
@@ -147,43 +156,27 @@ fn test_remove_file() {
 
     fs::File::create(&tmpdir_path.join("dir/subfile")).unwrap();
 
-    for (path, lookup_flags, allow_enos) in [
-        (
-            ".",
-            LookupFlags::empty(),
-            [libc::EISDIR, libc::EPERM].as_ref(),
-        ),
-        (
-            "/",
-            LookupFlags::IN_ROOT,
-            [libc::EISDIR, libc::EPERM].as_ref(),
-        ),
-        (
-            "..",
-            LookupFlags::IN_ROOT,
-            [libc::EISDIR, libc::EPERM].as_ref(),
-        ),
-        (
-            "dir",
-            LookupFlags::empty(),
-            [libc::EISDIR, libc::EPERM].as_ref(),
-        ),
-        (
-            "dir/subfile/..",
-            LookupFlags::empty(),
-            [libc::ENOTDIR].as_ref(),
-        ),
-    ]
-    .iter()
-    {
-        let eno = tmpdir
-            .remove_file(*path, *lookup_flags)
-            .unwrap_err()
-            .raw_os_error()
-            .unwrap();
+    macro_rules! check_err {
+        ($path:expr, $lookup_flags:expr, $($enos:pat)|+) => {{
+            let eno = tmpdir
+                .remove_file($path, $lookup_flags)
+                .unwrap_err()
+                .raw_os_error()
+                .unwrap();
 
-        assert!(allow_enos.contains(&eno), "{}", eno);
+            assert!(matches!(eno, $($enos)|+), "{}", eno);
+        }};
+
+        ($path:expr, $($enos:pat)|+) => {
+            check_err!($path, LookupFlags::empty(), $($enos)|+)
+        };
     }
+
+    check_err!(".", libc::EISDIR | libc::EPERM);
+    check_err!("/", LookupFlags::IN_ROOT, libc::EISDIR | libc::EPERM);
+    check_err!("..", LookupFlags::IN_ROOT, libc::EISDIR | libc::EPERM);
+    check_err!("dir", libc::EISDIR | libc::EPERM);
+    check_err!("dir/subfile/..", libc::ENOTDIR);
 
     tmpdir
         .remove_file("dir/subfile", LookupFlags::empty())
@@ -211,23 +204,27 @@ fn test_symlinks() {
         .symlink("dir/sublink", "subtarget", LookupFlags::empty())
         .unwrap();
 
-    for (path, lookup_flags, eno) in [
-        (".", LookupFlags::empty(), libc::EEXIST),
-        ("/", LookupFlags::IN_ROOT, libc::EEXIST),
-        ("..", LookupFlags::IN_ROOT, libc::EEXIST),
-        ("dir", LookupFlags::empty(), libc::EEXIST),
-        ("dir/sublink/..", LookupFlags::empty(), libc::ENOENT),
-    ]
-    .iter()
-    {
-        assert_eq!(
-            tmpdir
-                .symlink(*path, "target", *lookup_flags)
-                .unwrap_err()
-                .raw_os_error(),
-            Some(*eno)
-        );
+    macro_rules! check_err {
+        ($path:expr, $lookup_flags:expr, $eno:expr) => {{
+            assert_eq!(
+                tmpdir
+                    .symlink($path, "target", $lookup_flags)
+                    .unwrap_err()
+                    .raw_os_error(),
+                Some($eno)
+            );
+        }};
+
+        ($path:expr, $eno:expr) => {
+            check_err!($path, LookupFlags::empty(), $eno)
+        };
     }
+
+    check_err!(".", libc::EEXIST);
+    check_err!("/", LookupFlags::IN_ROOT, libc::EEXIST);
+    check_err!("..", LookupFlags::IN_ROOT, libc::EEXIST);
+    check_err!("dir", libc::EEXIST);
+    check_err!("dir/sublink/..", libc::ENOENT);
 
     assert_eq!(
         tmpdir.read_link("link", LookupFlags::empty()).unwrap(),
@@ -252,24 +249,28 @@ fn test_symlinks() {
         Path::new("subtarget"),
     );
 
-    for (path, lookup_flags, eno) in [
-        (".", LookupFlags::empty(), libc::EINVAL),
-        ("/", LookupFlags::IN_ROOT, libc::EINVAL),
-        ("..", LookupFlags::IN_ROOT, libc::EINVAL),
-        ("dir", LookupFlags::empty(), libc::EINVAL),
-        ("file", LookupFlags::empty(), libc::EINVAL),
-        ("dir/sublink/..", LookupFlags::empty(), libc::ENOENT),
-    ]
-    .iter()
-    {
-        assert_eq!(
-            tmpdir
-                .read_link(*path, *lookup_flags)
-                .unwrap_err()
-                .raw_os_error(),
-            Some(*eno),
-        );
+    macro_rules! check_err {
+        ($path:expr, $lookup_flags:expr, $eno:expr) => {{
+            assert_eq!(
+                tmpdir
+                    .read_link($path, $lookup_flags)
+                    .unwrap_err()
+                    .raw_os_error(),
+                Some($eno)
+            );
+        }};
+
+        ($path:expr, $eno:expr) => {
+            check_err!($path, LookupFlags::empty(), $eno)
+        };
     }
+
+    check_err!(".", libc::EINVAL);
+    check_err!("/", LookupFlags::IN_ROOT, libc::EINVAL);
+    check_err!("..", LookupFlags::IN_ROOT, libc::EINVAL);
+    check_err!("dir", libc::EINVAL);
+    check_err!("file", libc::EINVAL);
+    check_err!("dir/sublink/..", libc::ENOENT);
 }
 
 #[test]
