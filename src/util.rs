@@ -114,23 +114,52 @@ pub fn openat(
 pub fn readlinkat(dir_fd: RawFd, path: &CStr) -> io::Result<PathBuf> {
     let mut buf = [0u8; libc::PATH_MAX as usize];
 
-    if unsafe {
+    match unsafe {
         libc::readlinkat(
             dir_fd,
             path.as_ptr(),
             buf.as_mut_ptr() as *mut libc::c_char,
             buf.len(),
         )
-    } < 0
-    {
-        Err(io::Error::last_os_error())
-    } else {
-        let len = buf
-            .iter()
-            .position(|c| *c == 0)
-            .unwrap_or_else(|| buf.len());
+    } {
+        -1 => Err(io::Error::last_os_error()),
 
-        Ok(PathBuf::from(OsString::from_vec(buf[..len].into())))
+        #[cfg(debug_assertions)]
+        0 => panic!("length cannot be zero"),
+
+        len => {
+            let len = len as usize;
+
+            // POSIX doesn't specify whether or not the returned string is nul-terminated.
+
+            // On these OSes, it won't be.
+            #[cfg(any(
+                target_os = "linux",
+                target_os = "android",
+                target_os = "freebsd",
+                target_os = "dragonfly",
+                target_os = "openbsd",
+                target_os = "netbsd",
+                target_os = "macos",
+                target_os = "ios",
+            ))]
+            debug_assert_ne!(buf[len - 1], 0);
+
+            // On other OSes, it *might* be. Let's check.
+            #[cfg(not(any(
+                target_os = "linux",
+                target_os = "android",
+                target_os = "freebsd",
+                target_os = "dragonfly",
+                target_os = "openbsd",
+                target_os = "netbsd",
+                target_os = "macos",
+                target_os = "ios",
+            )))]
+            let len = if buf[len - 1] == 0 { len - 1 } else { len };
+
+            Ok(PathBuf::from(OsString::from_vec(buf[..len].into())))
+        }
     }
 }
 
