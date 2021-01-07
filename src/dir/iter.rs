@@ -147,20 +147,18 @@ impl Entry {
             return None;
         }
 
-        #[cfg(not(any(
-            target_os = "freebsd",
-            target_os = "dragonfly",
-            target_os = "openbsd",
-            target_os = "netbsd",
-        )))]
-        let ino = entry.d_ino as u64;
-        #[cfg(any(
-            target_os = "freebsd",
-            target_os = "dragonfly",
-            target_os = "openbsd",
-            target_os = "netbsd",
-        ))]
-        let ino = entry.d_fileno as u64;
+        cfg_if::cfg_if! {
+            if #[cfg(any(
+                target_os = "freebsd",
+                target_os = "dragonfly",
+                target_os = "openbsd",
+                target_os = "netbsd",
+            ))] {
+                let ino = entry.d_fileno as u64;
+            } else {
+                let ino = entry.d_ino as u64;
+            }
+        }
 
         Some(Self {
             fname: c_fname.to_owned(),

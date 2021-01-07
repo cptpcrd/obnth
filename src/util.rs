@@ -132,31 +132,24 @@ pub fn readlinkat(dir_fd: RawFd, path: &CStr) -> io::Result<PathBuf> {
 
             // POSIX doesn't specify whether or not the returned string is nul-terminated.
 
-            // On these OSes, it won't be.
-            #[cfg(any(
-                target_os = "linux",
-                target_os = "android",
-                target_os = "freebsd",
-                target_os = "dragonfly",
-                target_os = "openbsd",
-                target_os = "netbsd",
-                target_os = "macos",
-                target_os = "ios",
-            ))]
-            debug_assert_ne!(buf[len - 1], 0);
-
-            // On other OSes, it *might* be. Let's check.
-            #[cfg(not(any(
-                target_os = "linux",
-                target_os = "android",
-                target_os = "freebsd",
-                target_os = "dragonfly",
-                target_os = "openbsd",
-                target_os = "netbsd",
-                target_os = "macos",
-                target_os = "ios",
-            )))]
-            let len = if buf[len - 1] == 0 { len - 1 } else { len };
+            cfg_if::cfg_if! {
+                if #[cfg(any(
+                    target_os = "linux",
+                    target_os = "android",
+                    target_os = "freebsd",
+                    target_os = "dragonfly",
+                    target_os = "openbsd",
+                    target_os = "netbsd",
+                    target_os = "macos",
+                    target_os = "ios",
+                ))] {
+                    // On these OSes, it won't be.
+                    debug_assert_ne!(buf[len - 1], 0);
+                } else {
+                    // On other OSes, it *might* be. Let's check.
+                    let len = if buf[len - 1] == 0 { len - 1 } else { len };
+                }
+            }
 
             Ok(PathBuf::from(OsString::from_vec(buf[..len].into())))
         }

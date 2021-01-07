@@ -200,51 +200,47 @@ impl Dir {
 
     /// Read the contents of the specified symlink.
     pub fn read_link<P: AsPath>(&self, path: P, lookup_flags: LookupFlags) -> io::Result<PathBuf> {
-        // On Linux, we can actually get a file descriptor to the *symlink*, then readlink() that.
-        // However, if we don't have openat2() then this costs an extra syscall, so let's only do
-        // it if the `openat2` feature is enabled.
+        cfg_if::cfg_if! {
+            if #[cfg(all(target_os = "linux", feature = "openat2"))] {
+                // On Linux, we can actually get a file descriptor to the *symlink*, then
+                // readlink() that. However, if we don't have openat2() then this costs an extra
+                // syscall, so let's only do it if the `openat2` feature is enabled.
 
-        #[cfg(all(target_os = "linux", feature = "openat2"))]
-        let target = {
-            let file = open_beneath(
-                self.fd,
-                path,
-                libc::O_PATH | libc::O_NOFOLLOW,
-                0,
-                lookup_flags,
-            )?;
+                let file = open_beneath(
+                    self.fd,
+                    path,
+                    libc::O_PATH | libc::O_NOFOLLOW,
+                    0,
+                    lookup_flags,
+                )?;
 
-            match util::readlinkat(file.as_raw_fd(), unsafe {
-                CStr::from_bytes_with_nul_unchecked(b"\0".as_ref())
-            }) {
-                Ok(target) => target,
+                match util::readlinkat(file.as_raw_fd(), unsafe {
+                    CStr::from_bytes_with_nul_unchecked(b"\0".as_ref())
+                }) {
+                    Ok(target) => Ok(target),
 
-                // This error means we got a file descriptor that doesn't point to a symlink
-                Err(e) if e.raw_os_error() == Some(libc::ENOENT) => {
-                    return Err(io::Error::from_raw_os_error(libc::EINVAL));
+                    // This error means we got a file descriptor that doesn't point to a symlink
+                    Err(e) if e.raw_os_error() == Some(libc::ENOENT) => {
+                        Err(io::Error::from_raw_os_error(libc::EINVAL))
+                    }
+
+                    Err(e) => Err(e),
                 }
-
-                Err(e) => return Err(e),
-            }
-        };
-
-        // On other OSes (or without openat2()), we have to split the path and perform a few more
-        // allocations.
-
-        #[cfg(not(all(target_os = "linux", feature = "openat2")))]
-        let target = {
-            let (subdir, fname) = prepare_inner_operation(self, path.as_path(), lookup_flags)?;
-
-            if let Some(fname) = fname {
-                let fd = subdir.as_ref().unwrap_or(self).as_raw_fd();
-
-                util::readlinkat(fd, &cstr(fname)?)?
             } else {
-                return Err(io::Error::from_raw_os_error(libc::EINVAL));
-            }
-        };
+                // On other OSes (or without openat2()), we have to split the path and perform a
+                // few more allocations.
 
-        Ok(target)
+                let (subdir, fname) = prepare_inner_operation(self, path.as_path(), lookup_flags)?;
+
+                if let Some(fname) = fname {
+                    let fd = subdir.as_ref().unwrap_or(self).as_raw_fd();
+
+                    util::readlinkat(fd, &cstr(fname)?)
+                } else {
+                    Err(io::Error::from_raw_os_error(libc::EINVAL))
+                }
+            }
+        }
     }
 
     /// Rename a file in this directory.
