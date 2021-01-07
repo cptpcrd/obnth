@@ -15,6 +15,7 @@ pub use libc::__error as errno_ptr;
 pub use libc::__errno as errno_ptr;
 
 #[cfg(target_os = "linux")]
+#[inline]
 pub fn renameat2(
     old_dfd: RawFd,
     old_path: &CStr,
@@ -133,6 +134,7 @@ pub fn readlinkat(dir_fd: RawFd, path: &CStr) -> io::Result<PathBuf> {
     }
 }
 
+#[inline]
 pub fn mkdirat(dir_fd: RawFd, path: &CStr, mode: libc::mode_t) -> io::Result<()> {
     if unsafe { libc::mkdirat(dir_fd, path.as_ptr(), mode) } < 0 {
         Err(io::Error::last_os_error())
@@ -141,6 +143,7 @@ pub fn mkdirat(dir_fd: RawFd, path: &CStr, mode: libc::mode_t) -> io::Result<()>
     }
 }
 
+#[inline]
 pub fn unlinkat(dir_fd: RawFd, path: &CStr, dir: bool) -> io::Result<()> {
     if unsafe {
         libc::unlinkat(
@@ -156,6 +159,7 @@ pub fn unlinkat(dir_fd: RawFd, path: &CStr, dir: bool) -> io::Result<()> {
     }
 }
 
+#[inline]
 pub fn symlinkat(target: &CStr, dir_fd: RawFd, path: &CStr) -> io::Result<()> {
     if unsafe { libc::symlinkat(target.as_ptr(), dir_fd, path.as_ptr()) } < 0 {
         Err(io::Error::last_os_error())
@@ -164,6 +168,7 @@ pub fn symlinkat(target: &CStr, dir_fd: RawFd, path: &CStr) -> io::Result<()> {
     }
 }
 
+#[inline]
 pub fn linkat(
     old_dfd: RawFd,
     old_path: &CStr,
@@ -187,6 +192,7 @@ pub fn linkat(
     }
 }
 
+#[inline]
 pub fn renameat(
     old_dfd: RawFd,
     old_path: &CStr,
