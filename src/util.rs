@@ -1,6 +1,7 @@
 use std::ffi::{CStr, OsStr, OsString};
 use std::fs;
 use std::io;
+use std::mem::MaybeUninit;
 use std::os::unix::prelude::*;
 use std::path::{Path, PathBuf};
 
@@ -40,23 +41,23 @@ pub fn renameat2(
 
 #[inline]
 pub fn fstat(fd: RawFd) -> io::Result<libc::stat> {
-    let mut stat = unsafe { std::mem::zeroed() };
+    let mut stat = MaybeUninit::uninit();
 
-    if unsafe { libc::fstat(fd, &mut stat) } < 0 {
+    if unsafe { libc::fstat(fd, stat.as_mut_ptr()) } < 0 {
         Err(io::Error::last_os_error())
     } else {
-        Ok(stat)
+        Ok(unsafe { stat.assume_init() })
     }
 }
 
 #[inline]
 pub fn fstatat(fd: RawFd, path: &CStr, flags: libc::c_int) -> io::Result<libc::stat> {
-    let mut stat = unsafe { std::mem::zeroed() };
+    let mut stat = MaybeUninit::uninit();
 
-    if unsafe { libc::fstatat(fd, path.as_ptr(), &mut stat, flags) } < 0 {
+    if unsafe { libc::fstatat(fd, path.as_ptr(), stat.as_mut_ptr(), flags) } < 0 {
         Err(io::Error::last_os_error())
     } else {
-        Ok(stat)
+        Ok(unsafe { stat.assume_init() })
     }
 }
 
