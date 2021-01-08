@@ -124,10 +124,9 @@ pub fn readlinkat(dir_fd: RawFd, path: &CStr) -> io::Result<PathBuf> {
     } {
         -1 => Err(io::Error::last_os_error()),
 
-        #[cfg(debug_assertions)]
-        0 => panic!("length cannot be zero"),
-
         len => {
+            debug_assert!(len > 0);
+
             let len = len as usize;
 
             // POSIX doesn't specify whether or not the returned string is nul-terminated.
