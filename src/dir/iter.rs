@@ -140,7 +140,29 @@ impl Entry {
     unsafe fn from_raw(rdir_it: &ReadDirIter, entry: *const libc::dirent) -> Option<Self> {
         let entry = &*entry;
 
-        let c_fname = CStr::from_ptr(entry.d_name.as_ptr());
+        cfg_if::cfg_if! {
+            if #[cfg(any(
+                target_os = "freebsd",
+                target_os = "dragonfly",
+                target_os = "openbsd",
+                target_os = "netbsd",
+                target_os = "macos",
+            ))] {
+                debug_assert!((entry.d_namlen as usize) < entry.d_name.len());
+
+                let fname_bytes = std::slice::from_raw_parts(
+                    entry.d_name.as_ptr() as *const _, entry.d_namlen as usize + 1
+                );
+
+                #[cfg(debug_assertions)]
+                CStr::from_bytes_with_nul(fname_bytes).unwrap();
+
+                let c_fname = CStr::from_bytes_with_nul_unchecked(fname_bytes);
+            } else {
+                let c_fname = CStr::from_ptr(entry.d_name.as_ptr());
+            }
+        }
+
         let fname_bytes = c_fname.to_bytes();
 
         if fname_bytes == b"." || fname_bytes == b".." {
