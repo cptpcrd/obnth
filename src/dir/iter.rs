@@ -72,8 +72,7 @@ impl ReadDirIter {
 
     /// Get the current seek position.
     ///
-    /// This directly corresponds to telldir(3). It is currently not available on Android.
-    #[cfg(not(target_os = "android"))]
+    /// This directly corresponds to telldir(3).
     #[inline]
     pub fn tell(&self) -> SeekPos {
         SeekPos(unsafe { libc::telldir(self.dstream.as_ptr()) })
@@ -82,10 +81,9 @@ impl ReadDirIter {
     /// Set the new seek position.
     ///
     /// This directly corresponds to seekdir(3). `pos` must be a value previously returned by
-    /// [`tell()`]. This function is currently not available on Android.
+    /// [`tell()`].
     ///
     /// [`tell()`]: #method.tell
-    #[cfg(not(target_os = "android"))]
     #[inline]
     pub fn seek(&mut self, pos: SeekPos) {
         unsafe {
