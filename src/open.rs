@@ -6,7 +6,7 @@ use std::io;
 use std::os::unix::prelude::*;
 use std::path::{Component, Path};
 
-use crate::{constants, sys, util, AsPath};
+use crate::{constants, util, AsPath};
 
 bitflags::bitflags! {
     /// Flags that modify path loookup when opening a file/directory beneath another directory.
@@ -110,6 +110,8 @@ fn open_beneath_openat2(
     mode: libc::mode_t,
     lookup_flags: LookupFlags,
 ) -> io::Result<Option<fs::File>> {
+    use crate::sys;
+
     if dir_fd == libc::AT_FDCWD {
         // An actual directory must be specified
         return Err(io::Error::from_raw_os_error(libc::EBADF));

@@ -1,4 +1,4 @@
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "openat2", target_os = "linux"))]
 #[repr(transparent)]
 bitflags::bitflags! {
     pub struct ResolveFlags: u64 {
@@ -10,7 +10,7 @@ bitflags::bitflags! {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "openat2", target_os = "linux"))]
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 #[repr(C)]
 pub struct open_how {
@@ -20,5 +20,5 @@ pub struct open_how {
 }
 
 // Correct on every architecture except alpha, which Rust doesn't support
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "openat2", target_os = "linux"))]
 pub const SYS_OPENAT2: libc::c_long = 437;
