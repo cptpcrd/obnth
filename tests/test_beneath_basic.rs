@@ -42,6 +42,7 @@ fn test_open_beneath_success() {
     std::os::unix::fs::symlink("/", tmpdir.join("f")).unwrap();
     std::os::unix::fs::symlink("./b", tmpdir.join("a/g")).unwrap();
     std::os::unix::fs::symlink(".", tmpdir.join("a/h")).unwrap();
+    std::os::unix::fs::symlink("/escape", tmpdir.join("a/i")).unwrap();
 
     check_ok!("a", libc::O_RDONLY | libc::O_DIRECTORY, "a");
     check_ok!("a/b", libc::O_RDONLY, "a/b");
@@ -79,6 +80,22 @@ fn test_open_beneath_success() {
         check_ok!("c", libc::O_PATH, "a/b");
         check_ok!("c", libc::O_PATH | libc::O_NOFOLLOW, "c");
     }
+
+    // Trying to open(O_CREAT) a symlink will *not* let the OS follow the symlink and escape. So it
+    // fails with EXDEV (escape detected) rather than succeeding (if running as root and able to
+    // create `/escape`) or failing with EACCES (if not running as root).
+    assert_eq!(
+        open_beneath(
+            tmpdir_fd,
+            "a/i",
+            libc::O_WRONLY | libc::O_CREAT,
+            0o666,
+            LookupFlags::empty()
+        )
+        .unwrap_err()
+        .raw_os_error(),
+        Some(libc::EXDEV),
+    );
 
     open_beneath(
         tmpdir_fd,
