@@ -40,6 +40,14 @@ fn test_create_remove_dir() {
         .create_dir("dir/subdir", 0o777, LookupFlags::empty())
         .unwrap();
 
+    tmpdir
+        .symlink("link", "dir/subdir", LookupFlags::empty())
+        .unwrap();
+
+    tmpdir
+        .symlink("link-noexist", "NOEXIST", LookupFlags::empty())
+        .unwrap();
+
     macro_rules! check_err {
         ($path:expr, $lookup_flags:expr, $eno:expr) => {
             assert_eq!(
@@ -67,6 +75,12 @@ fn test_create_remove_dir() {
     check_err!("../", LookupFlags::IN_ROOT, libc::EEXIST);
     check_err!("dir/subdir/..", LookupFlags::IN_ROOT, libc::EEXIST);
 
+    // Trying to mkdir() a link (even if the target doesn't exist) should fail with EEXIST
+    check_err!("link", libc::EEXIST);
+    check_err!("link/", libc::EEXIST);
+    check_err!("link-noexist", libc::EEXIST);
+    check_err!("link-noexist/", libc::EEXIST);
+
     macro_rules! check_err {
         ($path:expr, $lookup_flags:expr, $eno:expr) => {
             assert_eq!(
@@ -91,6 +105,12 @@ fn test_create_remove_dir() {
     check_err!("dir/.", libc::EBUSY);
     check_err!("dir/./", libc::EBUSY);
     check_err!("dir/subdir/..", libc::EBUSY);
+
+    // Trying to rmdir() a symbolic link should fail with ENOTDIR
+    check_err!("link", libc::ENOTDIR);
+    check_err!("link/", libc::ENOTDIR);
+    check_err!("link-noexist", libc::ENOTDIR);
+    check_err!("link-noexist/", libc::ENOTDIR);
 
     tmpdir
         .remove_dir("dir/subdir", LookupFlags::empty())
@@ -156,6 +176,14 @@ fn test_remove_file() {
 
     fs::File::create(&tmpdir_path.join("dir/subfile")).unwrap();
 
+    tmpdir
+        .symlink("link", "file", LookupFlags::empty())
+        .unwrap();
+
+    tmpdir
+        .symlink("link-noexist", "NOEXIST", LookupFlags::empty())
+        .unwrap();
+
     macro_rules! check_err {
         ($path:expr, $lookup_flags:expr, $($enos:pat)|+) => {{
             let eno = tmpdir
@@ -178,6 +206,13 @@ fn test_remove_file() {
     check_err!("dir", libc::EISDIR | libc::EPERM);
     check_err!("dir/subfile/..", libc::ENOTDIR);
 
+    // Trying to unlink() the symlinks will succeed
+    tmpdir.remove_file("link", LookupFlags::empty()).unwrap();
+    tmpdir
+        .remove_file("link-noexist", LookupFlags::empty())
+        .unwrap();
+
+    // But it leaves the original file in place
     tmpdir
         .remove_file("dir/subfile", LookupFlags::empty())
         .unwrap();
