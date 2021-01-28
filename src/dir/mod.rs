@@ -317,8 +317,12 @@ impl Dir {
 
     /// Recover the path to the directory that this `Dir` is currently open to.
     ///
-    /// **WARNING**: Be careful of race conditions, and **don't** use this path to open any files
-    /// within the directory.
+    /// **WARNINGS (make sure to read)**:
+    /// - **Do NOT** use this path to open any files within the directory (i.e.
+    ///   `File::open(path.join("file.txt"))`! That would defeat the entire purpose of this crate
+    ///   by opening vectors for symlink attacks.
+    /// - If a potentially malicious user controls a parent directory of the directory that this
+    ///   `Dir` is currently open to, the path returned by this function is NOT safe to use.
     ///
     /// OS-specific optimizations:
     /// - On Linux, this will try `readlink("/proc/self/fd/$fd")`.
