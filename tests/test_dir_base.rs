@@ -260,6 +260,8 @@ fn test_symlinks() {
     check_err!("..", LookupFlags::IN_ROOT, libc::EEXIST);
     check_err!("dir", libc::EEXIST);
     check_err!("dir/sublink/..", libc::ENOENT);
+    check_err!("link", libc::EEXIST);
+    check_err!("link/", libc::EEXIST);
 
     assert_eq!(
         tmpdir.read_link("link", LookupFlags::empty()).unwrap(),
@@ -356,6 +358,12 @@ fn test_hardlink() {
         .create_dir("dir2", 0o777, LookupFlags::empty())
         .unwrap();
 
+    tmpdir.symlink("link", "a", LookupFlags::empty()).unwrap();
+
+    tmpdir
+        .symlink("link-noexist", "NOEXIST", LookupFlags::empty())
+        .unwrap();
+
     let a_meta = tmpdir.metadata("a", LookupFlags::empty()).unwrap();
 
     obnth::hardlink(&tmpdir, "a", &tmpdir, "dir/a", LookupFlags::empty()).unwrap();
@@ -389,6 +397,46 @@ fn test_hardlink() {
             .raw_os_error(),
         Some(libc::EEXIST)
     );
+
+    assert_eq!(
+        obnth::hardlink(&tmpdir, "dir", &tmpdir, "link", LookupFlags::empty())
+            .unwrap_err()
+            .raw_os_error(),
+        Some(libc::EEXIST)
+    );
+
+    assert_eq!(
+        obnth::hardlink(&tmpdir, "dir", &tmpdir, "link/", LookupFlags::empty())
+            .unwrap_err()
+            .raw_os_error(),
+        Some(libc::EEXIST)
+    );
+
+    assert_eq!(
+        obnth::hardlink(
+            &tmpdir,
+            "dir",
+            &tmpdir,
+            "link-noexist",
+            LookupFlags::empty()
+        )
+        .unwrap_err()
+        .raw_os_error(),
+        Some(libc::EEXIST)
+    );
+
+    assert_eq!(
+        obnth::hardlink(
+            &tmpdir,
+            "dir",
+            &tmpdir,
+            "link-noexist/",
+            LookupFlags::empty()
+        )
+        .unwrap_err()
+        .raw_os_error(),
+        Some(libc::EEXIST)
+    );
 }
 
 #[test]
@@ -409,6 +457,12 @@ fn test_rename() {
         .unwrap();
     tmpdir
         .create_dir("dir2", 0o777, LookupFlags::empty())
+        .unwrap();
+
+    tmpdir.symlink("link", "a", LookupFlags::empty()).unwrap();
+
+    tmpdir
+        .symlink("link-noexist", "NOEXIST", LookupFlags::empty())
         .unwrap();
 
     let a_meta = tmpdir.metadata("a", LookupFlags::empty()).unwrap();
@@ -455,6 +509,46 @@ fn test_rename() {
         &dir_meta,
         &tmpdir.metadata("dir2", LookupFlags::empty()).unwrap()
     ));
+
+    assert_eq!(
+        obnth::rename(&tmpdir, "dir2", &tmpdir, "link", LookupFlags::empty())
+            .unwrap_err()
+            .raw_os_error(),
+        Some(libc::ENOTDIR)
+    );
+
+    assert_eq!(
+        obnth::rename(&tmpdir, "dir2", &tmpdir, "link/", LookupFlags::empty())
+            .unwrap_err()
+            .raw_os_error(),
+        Some(libc::ENOTDIR)
+    );
+
+    assert_eq!(
+        obnth::rename(
+            &tmpdir,
+            "dir2",
+            &tmpdir,
+            "link-noexist",
+            LookupFlags::empty()
+        )
+        .unwrap_err()
+        .raw_os_error(),
+        Some(libc::ENOTDIR)
+    );
+
+    assert_eq!(
+        obnth::rename(
+            &tmpdir,
+            "dir2",
+            &tmpdir,
+            "link-noexist/",
+            LookupFlags::empty()
+        )
+        .unwrap_err()
+        .raw_os_error(),
+        Some(libc::ENOTDIR)
+    );
 }
 
 #[cfg(target_os = "linux")]
@@ -478,6 +572,12 @@ fn test_rename2() {
         .unwrap();
     tmpdir
         .create_dir("dir2", 0o777, LookupFlags::empty())
+        .unwrap();
+
+    tmpdir.symlink("link", "a", LookupFlags::empty()).unwrap();
+
+    tmpdir
+        .symlink("link-noexist", "NOEXIST", LookupFlags::empty())
         .unwrap();
 
     let a_meta = tmpdir.metadata("a", LookupFlags::empty()).unwrap();
@@ -554,4 +654,60 @@ fn test_rename2() {
         &dir_meta,
         &tmpdir.metadata("dir2", LookupFlags::empty()).unwrap()
     ));
+
+    assert_eq!(
+        rename2(
+            &tmpdir,
+            "dir2",
+            &tmpdir,
+            "link",
+            Rename2Flags::empty(),
+            LookupFlags::empty()
+        )
+        .unwrap_err()
+        .raw_os_error(),
+        Some(libc::ENOTDIR)
+    );
+
+    assert_eq!(
+        rename2(
+            &tmpdir,
+            "dir2",
+            &tmpdir,
+            "link/",
+            Rename2Flags::empty(),
+            LookupFlags::empty()
+        )
+        .unwrap_err()
+        .raw_os_error(),
+        Some(libc::ENOTDIR)
+    );
+
+    assert_eq!(
+        rename2(
+            &tmpdir,
+            "dir2",
+            &tmpdir,
+            "link-noexist",
+            Rename2Flags::empty(),
+            LookupFlags::empty(),
+        )
+        .unwrap_err()
+        .raw_os_error(),
+        Some(libc::ENOTDIR)
+    );
+
+    assert_eq!(
+        rename2(
+            &tmpdir,
+            "dir2",
+            &tmpdir,
+            "link-noexist/",
+            Rename2Flags::empty(),
+            LookupFlags::empty(),
+        )
+        .unwrap_err()
+        .raw_os_error(),
+        Some(libc::ENOTDIR)
+    );
 }
