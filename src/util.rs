@@ -265,6 +265,15 @@ pub fn path_split(path: &Path) -> Option<(Option<&OsStr>, &OsStr)> {
     )
 }
 
+pub fn strip_trailing_slashes(mut path: &OsStr) -> &OsStr {
+    loop {
+        match path.as_bytes().split_last() {
+            Some((b'/', rest)) => path = OsStr::from_bytes(rest),
+            _ => return path,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -396,5 +405,29 @@ mod tests {
             assert_eq!(unsafe { *errno_ptr() }, eno);
             assert_eq!(io::Error::last_os_error().raw_os_error().unwrap(), eno);
         }
+    }
+
+    #[test]
+    fn test_strip_trailing_slashes() {
+        assert_eq!(strip_trailing_slashes(OsStr::new("")), OsStr::new(""));
+        assert_eq!(strip_trailing_slashes(OsStr::new("/")), OsStr::new(""));
+        assert_eq!(strip_trailing_slashes(OsStr::new("//")), OsStr::new(""));
+
+        assert_eq!(strip_trailing_slashes(OsStr::new("a")), OsStr::new("a"));
+        assert_eq!(strip_trailing_slashes(OsStr::new("a/")), OsStr::new("a"));
+        assert_eq!(strip_trailing_slashes(OsStr::new("a//")), OsStr::new("a"));
+
+        assert_eq!(
+            strip_trailing_slashes(OsStr::new("/a/b")),
+            OsStr::new("/a/b")
+        );
+        assert_eq!(
+            strip_trailing_slashes(OsStr::new("/a/b/")),
+            OsStr::new("/a/b")
+        );
+        assert_eq!(
+            strip_trailing_slashes(OsStr::new("/a/b//")),
+            OsStr::new("/a/b")
+        );
     }
 }

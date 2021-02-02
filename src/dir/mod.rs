@@ -122,17 +122,10 @@ impl Dir {
     ) -> io::Result<()> {
         let (subdir, fname) = prepare_inner_operation(self, path.as_path(), lookup_flags)?;
 
-        if let Some(mut fname) = fname {
+        if let Some(fname) = fname {
             let fd = subdir.as_ref().unwrap_or(self).as_raw_fd();
 
-            // Some OSes follow symlinks if the path ends with a slash; strip it to avoid that
-            while let Some((last, rest)) = fname.as_bytes().split_last() {
-                if *last != b'/' {
-                    break;
-                }
-
-                fname = OsStr::from_bytes(rest);
-            }
+            let fname = crate::util::strip_trailing_slashes(fname);
 
             util::mkdirat(fd, &cstr(fname)?, mode)
         } else {
@@ -144,17 +137,10 @@ impl Dir {
     pub fn remove_dir<P: AsPath>(&self, path: P, lookup_flags: LookupFlags) -> io::Result<()> {
         let (subdir, fname) = prepare_inner_operation(self, path.as_path(), lookup_flags)?;
 
-        if let Some(mut fname) = fname {
+        if let Some(fname) = fname {
             let fd = subdir.as_ref().unwrap_or(self).as_raw_fd();
 
-            // Some OSes follow symlinks if the path ends with a slash; strip it to avoid that
-            while let Some((last, rest)) = fname.as_bytes().split_last() {
-                if *last != b'/' {
-                    break;
-                }
-
-                fname = OsStr::from_bytes(rest);
-            }
+            let fname = crate::util::strip_trailing_slashes(fname);
 
             match util::unlinkat(fd, &cstr(fname)?, true) {
                 Err(e) => {
