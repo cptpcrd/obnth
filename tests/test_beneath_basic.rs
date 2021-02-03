@@ -43,6 +43,7 @@ fn test_open_beneath_success() {
     std::os::unix::fs::symlink("./b", tmpdir.join("a/g")).unwrap();
     std::os::unix::fs::symlink(".", tmpdir.join("a/h")).unwrap();
     std::os::unix::fs::symlink("/escape", tmpdir.join("a/i")).unwrap();
+    std::os::unix::fs::symlink("/a/", tmpdir.join("j")).unwrap();
 
     check_ok!("a", libc::O_RDONLY | libc::O_DIRECTORY, "a");
     check_ok!("a/b", libc::O_RDONLY, "a/b");
@@ -61,6 +62,7 @@ fn test_open_beneath_success() {
 
     check_ok!("c", libc::O_WRONLY, LookupFlags::IN_ROOT, "a/b");
     check_ok!("d", libc::O_WRONLY, LookupFlags::IN_ROOT, "a/b");
+    check_ok!("j/", libc::O_RDONLY, LookupFlags::IN_ROOT, "a");
     check_ok!("f", libc::O_RDONLY, LookupFlags::IN_ROOT, ".");
 
     check_ok!("a/g", libc::O_RDONLY, LookupFlags::IN_ROOT, "a/b");

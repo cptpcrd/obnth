@@ -174,6 +174,8 @@ impl Dir {
         if let Some(fname) = fname {
             let fd = subdir.as_ref().unwrap_or(self).as_raw_fd();
 
+            let fname = crate::util::strip_trailing_slashes(fname);
+
             util::unlinkat(fd, &cstr(fname)?, false)
         } else {
             Err(io::Error::from_raw_os_error(libc::EISDIR))
@@ -195,6 +197,8 @@ impl Dir {
 
         if let Some(fname) = fname {
             let fd = subdir.as_ref().unwrap_or(self).as_raw_fd();
+
+            let fname = crate::util::strip_trailing_slashes(fname);
 
             target.with_cstr(|target| util::symlinkat(target, fd, &cstr(fname)?))
         } else {
@@ -238,6 +242,8 @@ impl Dir {
 
                 if let Some(fname) = fname {
                     let fd = subdir.as_ref().unwrap_or(self).as_raw_fd();
+
+                    let fname = crate::util::strip_trailing_slashes(fname);
 
                     util::readlinkat(fd, &cstr(fname)?)
                 } else {
@@ -311,6 +317,8 @@ impl Dir {
         let subdir = subdir.as_ref().unwrap_or(self);
 
         if let Some(fname) = fname {
+            let fname = crate::util::strip_trailing_slashes(fname);
+
             fname.with_cstr(|s| {
                 util::fstatat(subdir.as_raw_fd(), s, libc::AT_SYMLINK_NOFOLLOW).map(Metadata::new)
             })
@@ -503,7 +511,7 @@ where
         prepare_inner_operation(old_dir, old_path.as_path(), lookup_flags)?;
 
     let old_fname = if let Some(old_fname) = old_fname {
-        old_fname
+        crate::util::strip_trailing_slashes(old_fname)
     } else {
         // Assume we can't create hardlinks to directories (it seems that macOS *can*, but it's
         // hacky)
@@ -517,6 +525,8 @@ where
     let new_subdir = new_subdir.as_ref().unwrap_or(new_dir);
 
     if let Some(new_fname) = new_fname {
+        let new_fname = crate::util::strip_trailing_slashes(new_fname);
+
         old_fname.with_cstr(|old_fname| {
             new_fname.with_cstr(|new_fname| {
                 util::linkat(
@@ -551,7 +561,7 @@ where
     let old_subdir = old_subdir.as_ref().unwrap_or(old_dir);
 
     let old_fname = if let Some(old_fname) = old_fname {
-        old_fname
+        crate::util::strip_trailing_slashes(old_fname)
     } else {
         return Err(std::io::Error::from_raw_os_error(libc::EBUSY));
     };
@@ -561,6 +571,8 @@ where
     let new_subdir = new_subdir.as_ref().unwrap_or(new_dir);
 
     if let Some(new_fname) = new_fname {
+        let new_fname = crate::util::strip_trailing_slashes(new_fname);
+
         old_fname.with_cstr(|old_fname| {
             new_fname.with_cstr(|new_fname| {
                 util::renameat(
@@ -603,7 +615,7 @@ where
     let old_subdir = old_subdir.as_ref().unwrap_or(old_dir);
 
     let old_fname = if let Some(old_fname) = old_fname {
-        old_fname
+        crate::util::strip_trailing_slashes(old_fname)
     } else {
         return Err(std::io::Error::from_raw_os_error(libc::EBUSY));
     };
@@ -613,6 +625,8 @@ where
     let new_subdir = new_subdir.as_ref().unwrap_or(new_dir);
 
     if let Some(new_fname) = new_fname {
+        let new_fname = crate::util::strip_trailing_slashes(new_fname);
+
         old_fname.with_cstr(|old_fname| {
             new_fname.with_cstr(|new_fname| {
                 util::renameat2(

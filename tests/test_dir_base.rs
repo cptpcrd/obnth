@@ -232,6 +232,10 @@ fn test_symlinks() {
         .unwrap();
 
     tmpdir
+        .symlink("link-exist", "dir", LookupFlags::empty())
+        .unwrap();
+
+    tmpdir
         .create_dir("dir", 0o777, LookupFlags::empty())
         .unwrap();
 
@@ -262,6 +266,8 @@ fn test_symlinks() {
     check_err!("dir/sublink/..", libc::ENOENT);
     check_err!("link", libc::EEXIST);
     check_err!("link/", libc::EEXIST);
+    check_err!("link-exist", libc::EEXIST);
+    check_err!("link-exist/", libc::EEXIST);
 
     assert_eq!(
         tmpdir.read_link("link", LookupFlags::empty()).unwrap(),
@@ -399,42 +405,30 @@ fn test_hardlink() {
     );
 
     assert_eq!(
-        obnth::hardlink(&tmpdir, "dir", &tmpdir, "link", LookupFlags::empty())
+        obnth::hardlink(&tmpdir, "a", &tmpdir, "link", LookupFlags::empty())
             .unwrap_err()
             .raw_os_error(),
         Some(libc::EEXIST)
     );
 
     assert_eq!(
-        obnth::hardlink(&tmpdir, "dir", &tmpdir, "link/", LookupFlags::empty())
+        obnth::hardlink(&tmpdir, "a", &tmpdir, "link/", LookupFlags::empty())
             .unwrap_err()
             .raw_os_error(),
         Some(libc::EEXIST)
     );
 
     assert_eq!(
-        obnth::hardlink(
-            &tmpdir,
-            "dir",
-            &tmpdir,
-            "link-noexist",
-            LookupFlags::empty()
-        )
-        .unwrap_err()
-        .raw_os_error(),
+        obnth::hardlink(&tmpdir, "a", &tmpdir, "link-noexist", LookupFlags::empty())
+            .unwrap_err()
+            .raw_os_error(),
         Some(libc::EEXIST)
     );
 
     assert_eq!(
-        obnth::hardlink(
-            &tmpdir,
-            "dir",
-            &tmpdir,
-            "link-noexist/",
-            LookupFlags::empty()
-        )
-        .unwrap_err()
-        .raw_os_error(),
+        obnth::hardlink(&tmpdir, "a", &tmpdir, "link-noexist/", LookupFlags::empty())
+            .unwrap_err()
+            .raw_os_error(),
         Some(libc::EEXIST)
     );
 }
