@@ -44,6 +44,7 @@ fn test_open_beneath_success() {
     std::os::unix::fs::symlink(".", tmpdir.join("a/h")).unwrap();
     std::os::unix::fs::symlink("/escape", tmpdir.join("a/i")).unwrap();
     std::os::unix::fs::symlink("/a/", tmpdir.join("j")).unwrap();
+    std::os::unix::fs::symlink("a", tmpdir.join("k")).unwrap();
 
     check_ok!("a", libc::O_RDONLY | libc::O_DIRECTORY, "a");
     check_ok!("a/b", libc::O_RDONLY, "a/b");
@@ -55,6 +56,11 @@ fn test_open_beneath_success() {
     check_ok!("e", libc::O_RDONLY, LookupFlags::IN_ROOT, "a");
     check_ok!("a/b", libc::O_WRONLY, "a/b");
     check_ok!("c", libc::O_WRONLY, "a/b");
+
+    check_ok!("e/", libc::O_RDONLY, "a/");
+    check_ok!("e/.", libc::O_RDONLY, "a/");
+    check_ok!("k/", libc::O_RDONLY, "a/");
+    check_ok!("k/.", libc::O_RDONLY, "a/");
 
     check_ok!(".", libc::O_RDONLY, ".");
     check_ok!("./", libc::O_RDONLY, ".");
@@ -81,6 +87,11 @@ fn test_open_beneath_success() {
 
         check_ok!("c", libc::O_PATH, "a/b");
         check_ok!("c", libc::O_PATH | libc::O_NOFOLLOW, "c");
+
+        check_ok!("e/", libc::O_PATH, "a/");
+        check_ok!("e/.", libc::O_PATH, "a/");
+        check_ok!("k/", libc::O_PATH, "a/");
+        check_ok!("k/.", libc::O_PATH, "a/");
     }
 
     // Trying to open(O_CREAT) a symlink will *not* let the OS follow the symlink and escape. So it

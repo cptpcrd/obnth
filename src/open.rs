@@ -117,6 +117,15 @@ fn open_beneath_openat2(
         return Err(io::Error::from_raw_os_error(libc::EBADF));
     }
 
+    // If there's a trailing slash, strip it and add in O_DIRECTORY
+    let path: Cow<CStr> = match path.to_bytes().split_last() {
+        Some((b'/', rest)) if !rest.is_empty() => {
+            flags |= libc::O_DIRECTORY;
+            Cow::Owned(unsafe { CString::from_vec_unchecked(rest.to_vec()) })
+        }
+        _ => Cow::Borrowed(path),
+    };
+
     flags |= libc::O_NOCTTY | libc::O_CLOEXEC;
 
     if flags & libc::O_PATH == libc::O_PATH {
