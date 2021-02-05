@@ -7,3 +7,5 @@
 [![codecov](https://codecov.io/gh/cptpcrd/obnth/branch/master/graph/badge.svg)](https://codecov.io/gh/cptpcrd/obnth)
 
 Allows securely opening files in untrusted directories on \*nix systems.
+
+**WARNING**: This crate is not production-ready yet. You may be interested in using [libpathrs](https://github.com/openSUSE/libpathrs) instead.
