@@ -19,7 +19,7 @@ openat2 = []
 
 [dependencies]
 libc = { version = "0.2", features = ["extra_traits"] }
-cfg-if = "0.1"
+cfg-if = "1.0"
 bitflags = "1.2"
 
 [dev-dependencies]
