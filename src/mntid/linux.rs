@@ -31,11 +31,6 @@ extern "C" {
 const PROC_SUPER_MAGIC: libc::c_long = 0x9fa0;
 
 #[inline]
-fn get_errno() -> i32 {
-    unsafe { *libc::__errno_location() }
-}
-
-#[inline]
 fn statfs(path: &CStr) -> io::Result<libc::statfs> {
     let mut buf = MaybeUninit::uninit();
     if unsafe { libc::statfs(path.as_ptr(), buf.as_mut_ptr()) } < 0 {
@@ -86,7 +81,7 @@ fn get_mnt_id_name_handle(fd: RawFd) -> io::Result<Option<u32>> {
         return Ok(None);
     }
 
-    match get_errno() {
+    match unsafe { *crate::util::errno_ptr() } {
         // EOVERFLOW is expected, and the mount ID *should* be set
         libc::EOVERFLOW => {
             debug_assert!(mnt_id >= 0);
