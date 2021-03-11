@@ -61,6 +61,7 @@
 mod as_path;
 mod constants;
 mod dir;
+mod mntid;
 mod open;
 mod sys;
 mod util;

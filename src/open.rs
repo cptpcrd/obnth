@@ -20,6 +20,11 @@ bitflags::bitflags! {
         /// directory (i.e. `/` or `a/../..`) will stay at the original directory instead of failing
         /// with EXDEV.
         const IN_ROOT = 0x02;
+
+        /// Block traversal of mount points during path resolution.
+        ///
+        /// On Linux, this includes bind mounts.
+        const NO_XDEV = 0x04;
     }
 }
 
@@ -152,6 +157,10 @@ fn open_beneath_openat2(
 
     if lookup_flags.contains(LookupFlags::NO_SYMLINKS) {
         how.resolve |= sys::ResolveFlags::NO_SYMLINKS;
+    }
+
+    if lookup_flags.contains(LookupFlags::NO_XDEV) {
+        how.resolve |= sys::ResolveFlags::NO_XDEV;
     }
 
     let res = unsafe {
@@ -315,6 +324,12 @@ fn do_open_beneath(
     if dir_fd_stat.st_mode & libc::S_IFMT != libc::S_IFDIR {
         return Err(io::Error::from_raw_os_error(libc::ENOTDIR));
     }
+
+    let dir_mnt_id = if lookup_flags.contains(LookupFlags::NO_XDEV) {
+        Some(crate::mntid::identify_mount(dir_fd)?)
+    } else {
+        None
+    };
 
     let mut parts = split_path(orig_path, orig_flags)?;
 
@@ -495,6 +510,16 @@ fn do_open_beneath(
                             );
                         }
                     }
+                }
+            }
+        }
+
+        debug_assert_eq!(lookup_flags.contains(LookupFlags::NO_XDEV), dir_mnt_id.is_some());
+
+        if let Some(dir_mnt_id) = dir_mnt_id {
+            if let Some(f) = cur_file.as_ref() {
+                if crate::mntid::identify_mount(f.as_raw_fd())? != dir_mnt_id {
+                    return Err(io::Error::from_raw_os_error(libc::EXDEV));
                 }
             }
         }
