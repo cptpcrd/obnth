@@ -359,31 +359,74 @@ fn do_open_beneath(
     let mut cur_file: Option<fs::File> = None;
     let mut saw_parent_elem = false;
 
-    #[inline]
-    fn open_part(
-        dir_fd: RawFd,
-        path: &CStr,
+    fn handle_possible_symlink(
+        relfd: RawFd,
+        relpath: &CStr,
         flags: libc::c_int,
-        mode: libc::mode_t,
-    ) -> io::Result<fs::File> {
-        let file = util::openat(dir_fd, path, flags | libc::O_NOFOLLOW, mode)?;
+        eno: libc::c_int,
+        found_symlinks: &mut u16,
+        max_symlinks: u16,
+        parts: &mut VecDeque<(Cow<CStr>, libc::c_int)>,
+    ) -> io::Result<()> {
+        debug_assert!(matches!(eno, libc::ELOOP | libc::ENOTDIR));
 
-        #[cfg(any(target_os = "linux", target_os = "android"))]
-        if flags & (libc::O_PATH | libc::O_NOFOLLOW | libc::O_DIRECTORY) == libc::O_PATH {
-            // On Linux, O_PATH|O_NOFOLLOW will return a file descriptor open to the *symlink*
-            // (though adding in O_DIRECTORY will prevent this by only allowing a directory). Since
-            // we "add in" O_NOFOLLOW, if O_PATH was specified and neither O_NOFOLLOW nor
-            // O_DIRECTORY was, we might accidentally open a symlink when that isn't what the user
-            // wants.
-            //
-            // So let's check if it's a symlink in that case.
+        // If we know it's definitely a symlink, and either a) we were given
+        // O_NOFOLLOW for this component, or b) we can't resolve any more symlinks,
+        // then let's skip the readlinkat() check and return ELOOP directly.
+        if eno == libc::ELOOP
+            && (flags & libc::O_NOFOLLOW == libc::O_NOFOLLOW || *found_symlinks >= max_symlinks)
+        {
+            return Err(io::Error::from_raw_os_error(libc::ELOOP));
+        }
 
-            if file.metadata()?.file_type().is_symlink() {
-                return Err(io::Error::from_raw_os_error(libc::ELOOP));
+        let target = match util::readlinkat(relfd, relpath) {
+            // Successfully read the symlink
+            Ok(t) => t,
+
+            // EINVAL means it's not a symlink
+            Err(e2) if e2.raw_os_error() == Some(libc::EINVAL) => {
+                return Err(io::Error::from_raw_os_error(if eno == libc::ENOTDIR {
+                    // All we knew was that it wasn't a directory, so it's probably another file
+                    // type.
+                    libc::ENOTDIR
+                } else {
+                    // We got ELOOP, indicating it *was* a symlink. Then we got EINVAL, indicating
+                    // that it *wasn't* a symlink.
+                    // This probably means a race condition. Let's pass up EAGAIN.
+                    libc::EAGAIN
+                }));
+            }
+
+            // Pass other errors up to the caller
+            Err(e2) => return Err(e2),
+        };
+
+        *found_symlinks += 1;
+        if flags & libc::O_NOFOLLOW == libc::O_NOFOLLOW || *found_symlinks > max_symlinks {
+            return Err(io::Error::from_raw_os_error(libc::ELOOP));
+        }
+
+        split_link_path_into(&target, flags, parts)?;
+
+        Ok(())
+    }
+
+    fn check_mnt_id(
+        dir_mnt_id: Option<crate::mntid::MountId>,
+        prev_fd: libc::c_int,
+        new_file: Option<&fs::File>,
+    ) -> io::Result<()> {
+        if let Some(dir_mnt_id) = dir_mnt_id {
+            if let Some(new_file) = new_file.as_ref() {
+                if new_file.as_raw_fd() != prev_fd
+                    && crate::mntid::identify_mount(new_file.as_raw_fd())? != dir_mnt_id
+                {
+                    return Err(io::Error::from_raw_os_error(libc::EXDEV));
+                }
             }
         }
 
-        Ok(file)
+        Ok(())
     }
 
     while let Some((part, flags)) = parts.pop_front() {
@@ -431,7 +474,47 @@ fn do_open_beneath(
                     saw_parent_elem = false;
                 }
 
-                match open_part(cur_fd, &part, flags, mode) {
+                match util::openat(cur_fd, &part, flags | libc::O_NOFOLLOW, mode) {
+                    #[cfg(any(target_os = "linux", target_os = "android"))]
+                    Ok(f) => {
+                        // On Linux, O_PATH|O_NOFOLLOW will return a file descriptor open to the *symlink*
+                        // (though adding in O_DIRECTORY will prevent this by only allowing a directory). Since
+                        // we "add in" O_NOFOLLOW, if O_PATH was specified and neither O_NOFOLLOW nor
+                        // O_DIRECTORY was, we might accidentally open a symlink when that isn't what the user
+                        // wants.
+                        //
+                        // So let's check if it's a symlink in that case.
+
+                        if flags & (libc::O_PATH | libc::O_NOFOLLOW | libc::O_DIRECTORY)
+                            == libc::O_PATH
+                            && f.metadata()?.file_type().is_symlink()
+                        {
+                            // It *is* a symlink.
+
+                            // First, make sure it's on the same mount.
+                            check_mnt_id(dir_mnt_id, cur_fd, Some(&f))?;
+
+                            // Now that we have this file descriptor open to a symlink, we can pass
+                            // *that* to readlinkat() to resolve the symlink.
+                            handle_possible_symlink(
+                                f.as_raw_fd(),
+                                unsafe { CStr::from_bytes_with_nul_unchecked(b"\0") },
+                                flags,
+                                libc::ELOOP,
+                                &mut found_symlinks,
+                                max_symlinks,
+                                &mut parts,
+                            )?;
+
+                            drop(f);
+                        } else {
+                            cur_file = Some(f);
+                        }
+                    }
+
+                    // On non-Linux/Android, we don't have to worry about having a file descriptor
+                    // open to the symlink
+                    #[cfg(not(any(target_os = "linux", target_os = "android")))]
                     Ok(f) => cur_file = Some(f),
 
                     Err(e) => {
@@ -463,63 +546,26 @@ fn do_open_beneath(
 
                         // It may have failed because it's a symlink.
                         // (If eno == libc::ELOOP, it's definitely a symlink.)
-
-                        // If we know it's definitely a symlink, and either a) we were given
-                        // O_NOFOLLOW for this component, or b) we can't resolve any more symlinks,
-                        // then let's skip the readlinkat() check and return ELOOP directly.
-                        if eno == libc::ELOOP
-                            && (flags & libc::O_NOFOLLOW == libc::O_NOFOLLOW
-                                || found_symlinks >= max_symlinks)
-                        {
-                            return Err(io::Error::from_raw_os_error(libc::ELOOP));
-                        }
-
-                        let target = match util::readlinkat(cur_fd, &part) {
-                            // Successfully read the symlink
-                            Ok(t) => t,
-
-                            // EINVAL means it's not a symlink
-                            Err(e2) if e2.raw_os_error() == Some(libc::EINVAL) => {
-                                return Err(if eno == libc::ENOTDIR {
-                                    // All we knew was that it wasn't a directory, so it's probably
-                                    // another file type.
-                                    e
-                                } else {
-                                    // We got ELOOP, indicating it *was* a symlink. Then we got EINVAL,
-                                    // indicating that it *wasn't* a symlink.
-                                    // This probably means a race condition. Let's pass up EAGAIN.
-                                    io::Error::from_raw_os_error(libc::EAGAIN)
-                                });
-                            }
-
-                            // Pass other errors up to the caller
-                            Err(e2) => return Err(e2),
-                        };
-
-                        found_symlinks += 1;
-                        if flags & libc::O_NOFOLLOW == libc::O_NOFOLLOW
-                            || found_symlinks > max_symlinks
-                        {
-                            return Err(io::Error::from_raw_os_error(libc::ELOOP));
-                        }
-
-                        split_link_path_into(&target, flags, &mut parts)?;
+                        handle_possible_symlink(
+                            cur_fd,
+                            &part,
+                            flags,
+                            eno,
+                            &mut found_symlinks,
+                            max_symlinks,
+                            &mut parts,
+                        )?;
                     }
                 }
             }
         }
 
-        debug_assert_eq!(lookup_flags.contains(LookupFlags::NO_XDEV), dir_mnt_id.is_some());
+        debug_assert_eq!(
+            lookup_flags.contains(LookupFlags::NO_XDEV),
+            dir_mnt_id.is_some()
+        );
 
-        if let Some(dir_mnt_id) = dir_mnt_id {
-            if let Some(f) = cur_file.as_ref() {
-                if f.as_raw_fd() != cur_fd
-                    && crate::mntid::identify_mount(f.as_raw_fd())? != dir_mnt_id
-                {
-                    return Err(io::Error::from_raw_os_error(libc::EXDEV));
-                }
-            }
-        }
+        check_mnt_id(dir_mnt_id, cur_fd, cur_file.as_ref())?;
     }
 
     if saw_parent_elem {
