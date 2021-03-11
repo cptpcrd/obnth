@@ -148,7 +148,7 @@ fn get_mnt_id_procfs(fd: RawFd) -> io::Result<Option<u32>> {
 fn is_procfs_real() -> bool {
     matches!(
         statfs(unsafe { CStr::from_bytes_with_nul_unchecked(b"/proc\0") }),
-        Ok(stat) if stat.f_type == PROC_SUPER_MAGIC,
+        Ok(stat) if stat.f_type == PROC_SUPER_MAGIC as _,
     )
 }
 
