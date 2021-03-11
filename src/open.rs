@@ -510,7 +510,9 @@ fn do_open_beneath(
 
         if let Some(dir_mnt_id) = dir_mnt_id {
             if let Some(f) = cur_file.as_ref() {
-                if crate::mntid::identify_mount(f.as_raw_fd())? != dir_mnt_id {
+                if f.as_raw_fd() != cur_fd
+                    && crate::mntid::identify_mount(f.as_raw_fd())? != dir_mnt_id
+                {
                     return Err(io::Error::from_raw_os_error(libc::EXDEV));
                 }
             }
