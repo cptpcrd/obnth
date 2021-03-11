@@ -282,7 +282,10 @@ fn split_link_path_into(
 
         debug_assert_eq!(path, Path::new("."));
 
-        queue.push_front((Cow::Borrowed(unsafe { CStr::from_bytes_with_nul_unchecked(b".\0") }), flags));
+        queue.push_front((
+            Cow::Borrowed(unsafe { CStr::from_bytes_with_nul_unchecked(b".\0") }),
+            flags,
+        ));
     }
 
     Ok(())
