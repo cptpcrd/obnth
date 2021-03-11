@@ -15,7 +15,7 @@ fn test_open_beneath_xdev() {
                 $path,
                 $flags,
                 0o666,
-                $lookup_flags | LookupFlags::NO_XDEV,
+                $lookup_flags | LookupFlags::NO_XDEV | LookupFlags::IN_ROOT,
             )
             .unwrap();
         };
@@ -33,7 +33,7 @@ fn test_open_beneath_xdev() {
                     $path,
                     $flags,
                     0o666,
-                    $lookup_flags | LookupFlags::NO_XDEV
+                    $lookup_flags | LookupFlags::NO_XDEV | LookupFlags::IN_ROOT,
                 )
                 .unwrap_err()
                 .raw_os_error(),
