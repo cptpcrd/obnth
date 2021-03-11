@@ -106,20 +106,23 @@ fn get_mnt_id_procfs(fd: RawFd) -> io::Result<Option<u32>> {
         return Ok(None);
     }
 
-    // Make sure the file descriptor is valid (otherwise we'd get ENOENT when looking in `/proc`)
-    if unsafe { libc::fcntl(fd, libc::F_GETFD) } < 0 {
-        return Err(io::Error::last_os_error());
-    }
-
     let path = format!("/proc/self/fdinfo/{}\0", fd);
     let path = CStr::from_bytes_with_nul(path.as_bytes()).unwrap();
 
-    let mut file = io::BufReader::new(crate::util::openat(
-        libc::AT_FDCWD,
-        path,
-        libc::O_RDONLY,
-        0,
-    )?);
+    let mut file = match crate::util::openat(libc::AT_FDCWD, path, libc::O_RDONLY, 0) {
+        Ok(f) => io::BufReader::new(f),
+
+        Err(e) => {
+            // Translate ENOENT to EBADF
+            // is_procfs_real() made sure that `/proc` is really a procfs, so ENOENT can't mean
+            // anything else.
+            return Err(if e.raw_os_error() == Some(libc::ENOENT) {
+                io::Error::from_raw_os_error(libc::EBADF)
+            } else {
+                e
+            });
+        }
+    };
 
     let mut buf = Vec::with_capacity(20);
 
