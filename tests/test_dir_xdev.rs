@@ -53,9 +53,9 @@ fn test_open_beneath_xdev() {
     check_ok!("bin/../bin", libc::O_RDONLY);
     check_ok!("bin/../../bin", libc::O_RDONLY);
 
-    check_ok!("bin/true", libc::O_RDONLY);
-    check_ok!("bin/../bin/true", libc::O_RDONLY);
-    check_ok!("bin/../../bin/true", libc::O_RDONLY);
+    check_ok!("bin/cat", libc::O_RDONLY);
+    check_ok!("bin/../bin/cat", libc::O_RDONLY);
+    check_ok!("bin/../../bin/cat", libc::O_RDONLY);
 
     check_err!("dev", libc::O_RDONLY, libc::EXDEV);
     check_err!("dev/fd", libc::O_RDONLY, libc::EXDEV);
