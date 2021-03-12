@@ -13,13 +13,13 @@ pub fn identify_mount(fd: RawFd) -> io::Result<MountId> {
 }
 
 #[repr(C)]
-pub struct file_handle {
+struct file_handle {
     pub handle_bytes: libc::c_uint,
     pub handle_type: libc::c_int,
 }
 
 extern "C" {
-    pub fn name_to_handle_at(
+    fn name_to_handle_at(
         dirfd: libc::c_int,
         pathname: *const libc::c_char,
         handle: *mut file_handle,
