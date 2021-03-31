@@ -167,8 +167,8 @@ fn open_beneath_openat2(
         libc::syscall(
             sys::SYS_OPENAT2,
             dir_fd,
-            path.as_ptr(),
-            &mut how,
+            path.as_ptr() as *const libc::c_char,
+            &mut how as *mut sys::open_how,
             std::mem::size_of::<sys::open_how>(),
         )
     };
