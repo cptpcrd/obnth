@@ -106,6 +106,7 @@ impl Dir {
     ///
     /// `path` or one of its components can refer to a symlink (unless `LookupFlags::NO_SYMLINKS`
     /// is passed), but the specified subdirectory must be contained within this directory.
+    #[inline]
     pub fn sub_dir<P: AsPath>(&self, path: P, lookup_flags: LookupFlags) -> io::Result<Self> {
         Ok(Self {
             fd: open_beneath(self.fd, path, constants::DIR_OPEN_FLAGS, 0, lookup_flags)?
@@ -246,6 +247,7 @@ impl Dir {
     /// Rename a file in this directory.
     ///
     /// This is exactly equivalent to `rename(self, old, self, new, lookup_flags)`.
+    #[inline]
     pub fn local_rename<P: AsPath, R: AsPath>(
         &self,
         old: P,
@@ -283,6 +285,7 @@ impl Dir {
     /// Try to "clone" this `Dir`.
     ///
     /// This is equivalent to `self.sub_dir(".")`, but more efficient.
+    #[inline]
     pub fn try_clone(&self) -> io::Result<Self> {
         Ok(Self {
             fd: util::dup(self.fd)?,
@@ -293,6 +296,7 @@ impl Dir {
     ///
     /// This is equivalent to `self.metadata(".", LookupFlags::empty())`, but it's significantly
     /// more efficient.
+    #[inline]
     pub fn self_metadata(&self) -> io::Result<Metadata> {
         util::fstat(self.fd).map(Metadata::new)
     }
@@ -432,6 +436,7 @@ impl Dir {
     ///
     /// This is roughly equivalent to `std::env::set_current_dir(self.recover_path()?)`, but 1) it
     /// is **much** more efficient, and 2) it is more secure (notably, it avoids race conditions).
+    #[inline]
     pub fn change_cwd_to(&self) -> io::Result<()> {
         if unsafe { libc::fchdir(self.fd) } < 0 {
             Err(io::Error::last_os_error())
