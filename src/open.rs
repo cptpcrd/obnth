@@ -24,6 +24,10 @@ bitflags::bitflags! {
         /// Block traversal of mount points during path resolution.
         ///
         /// On Linux, this includes bind mounts.
+        ///
+        /// Note that on Linux, if `openat2()` is not available (e.g. on kernels older than 5.6, or
+        /// it's blocked by a seccomp rule) then this option may require `/proc` to be mounted to
+        /// work reliably.
         const NO_XDEV = 0x04;
     }
 }

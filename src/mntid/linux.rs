@@ -51,7 +51,7 @@ fn get_mnt_id(fd: RawFd) -> io::Result<u32> {
 
     Err(io::Error::new(
         io::ErrorKind::Other,
-        "unable to get mount ID",
+        "unable to get mount ID; is /proc mounted?",
     ))
 }
 
