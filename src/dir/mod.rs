@@ -28,14 +28,14 @@ bitflags::bitflags! {
         ///
         /// This requires support from the underlying filesystem; older kernels do not support this
         /// for a number of filesystems. See renameat2(2) for more details.
-        const NOREPLACE = libc::RENAME_NOREPLACE;
+        const NOREPLACE = libc::RENAME_NOREPLACE as libc::c_int;
         /// Atomically exchange the "old" and "new" files.
-        const EXCHANGE = libc::RENAME_EXCHANGE;
+        const EXCHANGE = libc::RENAME_EXCHANGE as libc::c_int;
         /// Create a "whiteout" object at the source of the rename while performing the rename.
         /// Useful for overlay/union filesystems.
         ///
         /// Added in Linux 3.18. Requires CAP_MKNOD.
-        const WHITEOUT = libc::RENAME_WHITEOUT;
+        const WHITEOUT = libc::RENAME_WHITEOUT as libc::c_int;
     }
 }
 
