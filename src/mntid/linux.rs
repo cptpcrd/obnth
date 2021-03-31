@@ -98,7 +98,7 @@ fn get_mnt_id_name_handle(fd: RawFd) -> io::Result<Option<u32>> {
 }
 
 fn get_mnt_id_procfs(fd: RawFd) -> io::Result<Option<u32>> {
-    // The `mnt_id` field in `/proc/self/mountinfo` (present since Linux 3.15) provides the mount
+    // The `mnt_id` field in `/proc/self/fdinfo/$FD` (present since Linux 3.15) provides the mount
     // ID
 
     // Is `/proc` mounted, and is it really a procfs?
