@@ -157,7 +157,7 @@ impl<'a> OpenOptions<'a> {
         Ok(flags)
     }
 
-    /// Open the file at `path` with the options specified by `path`.
+    /// Open the file at `path` with the options specified by `self`.
     #[inline]
     pub fn open<P: AsPath>(&self, path: P) -> io::Result<fs::File> {
         crate::open_beneath(
