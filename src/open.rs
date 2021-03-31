@@ -94,6 +94,20 @@ pub fn has_o_search() -> bool {
 ///    it cannot become the process's controlling terminal.
 ///
 /// [`LookupFlags`]: ./struct.LookupFlags.html
+///
+/// # Errors
+///
+/// Besides the normal errors that can occur with calling `openat()`, this function will fail with:
+///
+/// - `ELOOP` if [`LookupFlags::NO_SYMLINKS`] is given and a component of the given `path` is a
+///   symbolic link.
+/// - `EXDEV` if any of the other conditions required by the given [`LookupFlags`] are not met.
+/// - `EAGAIN` if a race condition occurred that prevented safely resolving the path. This usually
+///   involves checking for escapes caused by `..` components.
+///
+///   In this case it may be desirable to retry the call, though if possible it's recommended to
+///   limit the number of retries in order to prevent DOSes (intentional or accidental) by other
+///   programs.
 pub fn open_beneath<P: AsPath>(
     dir_fd: RawFd,
     path: P,
