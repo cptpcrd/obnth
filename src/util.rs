@@ -14,6 +14,46 @@ pub use libc::__error as errno_ptr;
 #[cfg(any(target_os = "android", target_os = "netbsd", target_os = "openbsd"))]
 pub use libc::__errno as errno_ptr;
 
+#[derive(Debug)]
+pub struct SymlinkCounter {
+    max: u16,
+    cur: u16,
+}
+
+impl SymlinkCounter {
+    #[inline]
+    pub fn new() -> Self {
+        use core::convert::TryInto;
+
+        Self {
+            max: unsafe { libc::sysconf(libc::_SC_SYMLOOP_MAX) }
+                .try_into()
+                .unwrap_or(crate::constants::DEFAULT_SYMLOOP_MAX),
+            cur: 0,
+        }
+    }
+
+    #[inline]
+    pub fn nolinks() -> Self {
+        Self { max: 0, cur: 0 }
+    }
+
+    #[inline]
+    pub fn exhausted(&self) -> bool {
+        self.cur >= self.max
+    }
+
+    #[inline]
+    pub fn advance(&mut self) -> io::Result<()> {
+        if self.exhausted() {
+            Err(io::Error::from_raw_os_error(libc::ELOOP))
+        } else {
+            self.cur += 1;
+            Ok(())
+        }
+    }
+}
+
 #[cfg(target_os = "linux")]
 #[inline]
 pub fn renameat2(
@@ -227,19 +267,6 @@ pub fn renameat(
     }
 }
 
-#[inline]
-pub fn get_symloop_max() -> Option<u16> {
-    let res = unsafe { libc::sysconf(libc::_SC_SYMLOOP_MAX) };
-
-    if res >= 0 {
-        // A C long could easily be larger than a u16, but values that high (>= 2 ** 16!) should
-        // never occur in SYMLOOP_MAX.
-        Some(res as u16)
-    } else {
-        None
-    }
-}
-
 pub fn path_split(path: &Path) -> Option<(Option<&OsStr>, &OsStr)> {
     if path == Path::new("/") || path.ends_with("..") {
         return None;
@@ -273,6 +300,29 @@ pub fn strip_trailing_slashes(mut path: &OsStr) -> &OsStr {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_symlink_counter() {
+        let mut links = SymlinkCounter::nolinks();
+        assert!(links.exhausted());
+        assert_eq!(
+            links.advance().unwrap_err().raw_os_error(),
+            Some(libc::ELOOP)
+        );
+
+        links = SymlinkCounter::new();
+        assert!(links.max > 0);
+        for _ in 0..links.max {
+            assert!(!links.exhausted());
+            links.advance().unwrap();
+        }
+
+        assert!(links.exhausted());
+        assert_eq!(
+            links.advance().unwrap_err().raw_os_error(),
+            Some(libc::ELOOP)
+        );
+    }
 
     #[test]
     fn test_ebadf_errors() {

@@ -348,13 +348,11 @@ fn do_open_beneath(
 
     let mut parts = split_path(orig_path, orig_flags)?;
 
-    let max_symlinks = if lookup_flags.contains(LookupFlags::NO_SYMLINKS) {
-        0
+    let mut links = if lookup_flags.contains(LookupFlags::NO_SYMLINKS) {
+        util::SymlinkCounter::nolinks()
     } else {
-        util::get_symloop_max().unwrap_or(constants::DEFAULT_SYMLOOP_MAX)
+        util::SymlinkCounter::new()
     };
-
-    let mut found_symlinks = 0;
 
     let mut cur_file: Option<fs::File> = None;
     let mut saw_parent_elem = false;
@@ -364,8 +362,7 @@ fn do_open_beneath(
         relpath: &CStr,
         flags: libc::c_int,
         eno: libc::c_int,
-        found_symlinks: &mut u16,
-        max_symlinks: u16,
+        links: &mut util::SymlinkCounter,
         parts: &mut VecDeque<(Cow<CStr>, libc::c_int)>,
     ) -> io::Result<()> {
         debug_assert!(matches!(eno, libc::ELOOP | libc::ENOTDIR));
@@ -373,8 +370,7 @@ fn do_open_beneath(
         // If we know it's definitely a symlink, and either a) we were given
         // O_NOFOLLOW for this component, or b) we can't resolve any more symlinks,
         // then let's skip the readlinkat() check and return ELOOP directly.
-        if eno == libc::ELOOP
-            && (flags & libc::O_NOFOLLOW == libc::O_NOFOLLOW || *found_symlinks >= max_symlinks)
+        if eno == libc::ELOOP && (flags & libc::O_NOFOLLOW == libc::O_NOFOLLOW || links.exhausted())
         {
             return Err(io::Error::from_raw_os_error(libc::ELOOP));
         }
@@ -401,8 +397,8 @@ fn do_open_beneath(
             Err(e2) => return Err(e2),
         };
 
-        *found_symlinks += 1;
-        if flags & libc::O_NOFOLLOW == libc::O_NOFOLLOW || *found_symlinks > max_symlinks {
+        links.advance()?;
+        if flags & libc::O_NOFOLLOW == libc::O_NOFOLLOW {
             return Err(io::Error::from_raw_os_error(libc::ELOOP));
         }
 
@@ -501,8 +497,7 @@ fn do_open_beneath(
                                 unsafe { CStr::from_bytes_with_nul_unchecked(b"\0") },
                                 flags,
                                 libc::ELOOP,
-                                &mut found_symlinks,
-                                max_symlinks,
+                                &mut links,
                                 &mut parts,
                             )?;
 
@@ -546,15 +541,7 @@ fn do_open_beneath(
 
                         // It may have failed because it's a symlink.
                         // (If eno == libc::ELOOP, it's definitely a symlink.)
-                        handle_possible_symlink(
-                            cur_fd,
-                            &part,
-                            flags,
-                            eno,
-                            &mut found_symlinks,
-                            max_symlinks,
-                            &mut parts,
-                        )?;
+                        handle_possible_symlink(cur_fd, &part, flags, eno, &mut links, &mut parts)?;
                     }
                 }
             }
