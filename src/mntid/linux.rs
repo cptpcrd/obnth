@@ -5,11 +5,20 @@ use std::mem::MaybeUninit;
 use std::os::unix::prelude::*;
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
-pub struct MountId(u32);
+pub struct MountId(u64, bool);
 
 #[inline]
-pub fn identify_mount(fd: RawFd) -> io::Result<MountId> {
-    get_mnt_id(fd).map(MountId)
+pub fn identify_mount(fd: RawFd, allow_bind: bool) -> io::Result<MountId> {
+    Ok(MountId(
+        if allow_bind {
+            crate::util::fstat(fd)?.st_dev as u64
+        } else {
+            get_mnt_id(fd)? as u64
+        },
+        // allow_bind *should* be consistent across calls, but let's make sure by recording it (it
+        // will then be used in MountId comparisons)
+        allow_bind,
+    ))
 }
 
 #[repr(C)]

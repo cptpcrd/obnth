@@ -5,7 +5,7 @@ use std::os::unix::prelude::*;
 pub struct MountId(libc::dev_t);
 
 #[inline]
-pub fn identify_mount(fd: RawFd) -> io::Result<MountId> {
+pub fn identify_mount(fd: RawFd, _allow_bind: bool) -> io::Result<MountId> {
     let st = crate::util::fstat(fd)?;
     Ok(MountId(st.st_dev))
 }

@@ -29,6 +29,13 @@ bitflags::bitflags! {
         /// it's blocked by a seccomp rule) then this option may require `/proc` to be mounted to
         /// work reliably.
         const NO_XDEV = 0x04;
+
+        /// If [`Self::NO_XDEV`] is specified, allow crossing bind mounts on Linux (assuming that
+        /// the bind mounts are on the same device; i.e. the same `st_dev` from `stat()`).
+        ///
+        /// Note that this prevents use of `openat2()` on Linux 5.6+, which may harm performance.
+        /// It also may require `/proc` to be mounted in order to work reliably.
+        const XDEV_BIND_ALLOW = 0x08;
     }
 }
 
@@ -134,6 +141,10 @@ fn open_beneath_openat2(
     lookup_flags: LookupFlags,
 ) -> io::Result<Option<fs::File>> {
     use crate::sys;
+
+    if lookup_flags.contains(LookupFlags::XDEV_BIND_ALLOW) {
+        return Ok(None);
+    }
 
     if dir_fd == libc::AT_FDCWD {
         // An actual directory must be specified
@@ -359,7 +370,10 @@ fn do_open_beneath(
     }
 
     let dir_mnt_id = if lookup_flags.contains(LookupFlags::NO_XDEV) {
-        Some(crate::mntid::identify_mount(dir_fd)?)
+        Some(crate::mntid::identify_mount(
+            dir_fd,
+            lookup_flags.contains(LookupFlags::XDEV_BIND_ALLOW),
+        )?)
     } else {
         None
     };
@@ -429,11 +443,15 @@ fn do_open_beneath(
         dir_mnt_id: Option<crate::mntid::MountId>,
         prev_fd: libc::c_int,
         new_file: Option<&fs::File>,
+        lookup_flags: LookupFlags,
     ) -> io::Result<()> {
         if let Some(dir_mnt_id) = dir_mnt_id {
             if let Some(new_file) = new_file.as_ref() {
                 if new_file.as_raw_fd() != prev_fd
-                    && crate::mntid::identify_mount(new_file.as_raw_fd())? != dir_mnt_id
+                    && crate::mntid::identify_mount(
+                        new_file.as_raw_fd(),
+                        lookup_flags.contains(LookupFlags::XDEV_BIND_ALLOW),
+                    )? != dir_mnt_id
                 {
                     return Err(io::Error::from_raw_os_error(libc::EXDEV));
                 }
@@ -564,7 +582,7 @@ fn do_open_beneath(
             dir_mnt_id.is_some()
         );
 
-        check_mnt_id(dir_mnt_id, cur_fd, cur_file.as_ref())?;
+        check_mnt_id(dir_mnt_id, cur_fd, cur_file.as_ref(), lookup_flags)?;
     }
 
     if saw_parent_elem {

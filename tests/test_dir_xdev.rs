@@ -18,6 +18,18 @@ fn test_open_beneath_xdev() {
                 $lookup_flags | LookupFlags::NO_XDEV | LookupFlags::IN_ROOT,
             )
             .unwrap();
+
+            open_beneath(
+                rootdir_fd,
+                $path,
+                $flags,
+                0o666,
+                $lookup_flags
+                    | LookupFlags::NO_XDEV
+                    | LookupFlags::XDEV_BIND_ALLOW
+                    | LookupFlags::IN_ROOT,
+            )
+            .unwrap();
         };
 
         ($path:expr, $flags:expr $(,)?) => {
@@ -34,6 +46,22 @@ fn test_open_beneath_xdev() {
                     $flags,
                     0o666,
                     $lookup_flags | LookupFlags::NO_XDEV | LookupFlags::IN_ROOT,
+                )
+                .unwrap_err()
+                .raw_os_error(),
+                Some($eno)
+            );
+
+            assert_eq!(
+                open_beneath(
+                    rootdir_fd,
+                    $path,
+                    $flags,
+                    0o666,
+                    $lookup_flags
+                        | LookupFlags::NO_XDEV
+                        | LookupFlags::XDEV_BIND_ALLOW
+                        | LookupFlags::IN_ROOT,
                 )
                 .unwrap_err()
                 .raw_os_error(),
