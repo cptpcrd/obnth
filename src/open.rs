@@ -489,7 +489,6 @@ fn do_open_beneath(
                 }
 
                 match util::openat(cur_fd, &part, flags | libc::O_NOFOLLOW, mode) {
-                    #[cfg(any(target_os = "linux", target_os = "android"))]
                     Ok(f) => {
                         // On Linux, O_PATH|O_NOFOLLOW will return a file descriptor open to the *symlink*
                         // (though adding in O_DIRECTORY will prevent this by only allowing a directory). Since
@@ -499,14 +498,12 @@ fn do_open_beneath(
                         //
                         // So let's check if it's a symlink in that case.
 
+                        #[cfg(any(target_os = "linux", target_os = "android"))]
                         if flags & (libc::O_PATH | libc::O_NOFOLLOW | libc::O_DIRECTORY)
                             == libc::O_PATH
                             && f.metadata()?.file_type().is_symlink()
                         {
                             // It *is* a symlink.
-
-                            // First, make sure it's on the same mount.
-                            check_mnt_id(dir_mnt_id, cur_fd, Some(&f))?;
 
                             // Now that we have this file descriptor open to a symlink, we can pass
                             // *that* to readlinkat() to resolve the symlink.
@@ -520,15 +517,12 @@ fn do_open_beneath(
                             )?;
 
                             drop(f);
-                        } else {
-                            cur_file = Some(f);
+                            // Stay where we are and skip the mount ID check
+                            continue;
                         }
-                    }
 
-                    // On non-Linux/Android, we don't have to worry about having a file descriptor
-                    // open to the symlink
-                    #[cfg(not(any(target_os = "linux", target_os = "android")))]
-                    Ok(f) => cur_file = Some(f),
+                        cur_file = Some(f);
+                    }
 
                     Err(e) => {
                         // When flags=O_DIRECTORY|O_NOFLLOW, if the last component is a symlink then
