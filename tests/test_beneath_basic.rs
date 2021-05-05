@@ -207,7 +207,10 @@ fn test_open_beneath_error() {
         libc::ELOOP
     );
 
+    check_err!("c/", libc::O_RDONLY, libc::ENOTDIR);
+
     check_err!("d", libc::O_RDONLY, libc::EXDEV);
+    check_err!("d/", libc::O_RDONLY, libc::EXDEV);
     check_err!("f", libc::O_RDONLY, libc::EXDEV);
     check_err!("..", libc::O_RDONLY, libc::EXDEV);
     check_err!("/", libc::O_RDONLY, libc::EXDEV);
