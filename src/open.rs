@@ -352,7 +352,9 @@ fn do_open_beneath(
 ) -> io::Result<fs::File> {
     let dir_fd_stat = util::fstat(dir_fd)?;
 
-    debug_assert_ne!(dir_fd, libc::AT_FDCWD);
+    if dir_fd == libc::AT_FDCWD {
+        return Err(io::Error::from_raw_os_error(libc::EBADF));
+    }
 
     if dir_fd_stat.st_mode & libc::S_IFMT != libc::S_IFDIR {
         return Err(io::Error::from_raw_os_error(libc::ENOTDIR));
