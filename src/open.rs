@@ -133,11 +133,14 @@ fn open_beneath_openat2(
     mode: libc::mode_t,
     lookup_flags: LookupFlags,
 ) -> io::Result<Option<fs::File>> {
-    use crate::sys;
-
     if dir_fd == libc::AT_FDCWD {
         // An actual directory must be specified
         return Err(io::Error::from_raw_os_error(libc::EBADF));
+    }
+
+    // Before we go any further, make sure the current kernel supports openat2()
+    if !openat2::has_openat2_cached() {
+        return Ok(None);
     }
 
     // If there's a trailing slash, strip it and add in O_DIRECTORY
@@ -149,65 +152,29 @@ fn open_beneath_openat2(
         _ => Cow::Borrowed(path),
     };
 
-    flags |= libc::O_NOCTTY | libc::O_CLOEXEC;
+    let mut how = openat2::OpenHow::new(flags | libc::O_NOCTTY | libc::O_CLOEXEC, mode as _);
+    how.truncate_flags_mode();
 
-    if flags & libc::O_PATH == libc::O_PATH {
-        // If we have O_PATH, throw out everything except the O_PATH and the flags that work with
-        // it.
-        flags &= libc::O_PATH | libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC;
-    }
-
-    let mut how = sys::open_how {
-        flags: flags as u64,
-        mode: 0,
-        resolve: sys::ResolveFlags::NO_MAGICLINKS,
-    };
-
-    if flags & libc::O_CREAT == libc::O_CREAT || flags & libc::O_TMPFILE == libc::O_TMPFILE {
-        how.mode = (mode & 0o777) as u64;
-    }
-
+    how.resolve |= openat2::ResolveFlags::NO_MAGICLINKS;
     if lookup_flags.contains(LookupFlags::IN_ROOT) {
-        how.resolve |= sys::ResolveFlags::IN_ROOT;
+        how.resolve |= openat2::ResolveFlags::IN_ROOT;
     } else {
-        how.resolve |= sys::ResolveFlags::BENEATH;
+        how.resolve |= openat2::ResolveFlags::BENEATH;
     }
-
     if lookup_flags.contains(LookupFlags::NO_SYMLINKS) {
-        how.resolve |= sys::ResolveFlags::NO_SYMLINKS;
+        how.resolve |= openat2::ResolveFlags::NO_SYMLINKS;
     }
-
     if lookup_flags.contains(LookupFlags::NO_XDEV) {
-        how.resolve |= sys::ResolveFlags::NO_XDEV;
+        how.resolve |= openat2::ResolveFlags::NO_XDEV;
     }
 
-    let res = unsafe {
-        libc::syscall(
-            sys::SYS_OPENAT2,
-            dir_fd,
-            path.as_ptr() as *const libc::c_char,
-            &mut how as *mut sys::open_how,
-            std::mem::size_of::<sys::open_how>(),
-        )
-    };
-
-    if res >= 0 {
-        Ok(Some(unsafe { fs::File::from_raw_fd(res as RawFd) }))
-    } else {
-        match unsafe { *libc::__errno_location() } {
-            // ENOSYS obviously means we're on a kernel that doesn't have openat2().
-            // E2BIG means an unsupported extension was specified.
-            //
-            // EPERM *could* mean that the file is sealed (from open(2)). However, there's another
-            // (more likely?) possibility: Sometimes seccomp filters block all syscalls (and return
-            // EPERM) by default, then only allow a carefully audited list of syscalls. If the
-            // seccomp filter doesn't include openat2() (or the current libseccomp isn't aware of
-            // it), then we might get EPERM when we *really* should be getting ENOSYS. So let's
-            // fall back on the traditional technique in that case.
-            libc::ENOSYS | libc::E2BIG | libc::EPERM => Ok(None),
-
-            eno => Err(io::Error::from_raw_os_error(eno)),
-        }
+    match openat2::openat2_cstr(Some(dir_fd), &path, &how) {
+        Ok(fd) => Ok(Some(unsafe { fs::File::from_raw_fd(fd) })),
+        // E2BIG means an unsupported extension was specified.
+        // EAGAIN is returned from openat2() with RESOLVE_BENEATH or RESOLVE_IN_ROOT if any file is
+        // renamed on the system. Fall back on the normal method if this happens.
+        Err(e) if matches!(e.raw_os_error(), Some(libc::E2BIG) | Some(libc::EAGAIN)) => Ok(None),
+        Err(e) => Err(e),
     }
 }
 

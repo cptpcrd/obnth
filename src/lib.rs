@@ -63,7 +63,6 @@ mod constants;
 mod dir;
 mod mntid;
 mod open;
-mod sys;
 mod util;
 
 pub use as_path::*;
