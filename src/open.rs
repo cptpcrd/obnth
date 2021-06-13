@@ -122,6 +122,13 @@ pub fn open_beneath<P: AsPath>(
         return Ok(file);
     }
 
+    #[cfg(all(feature = "o_resolve_beneath", target_os = "freebsd"))]
+    if let Some(file) =
+        path.with_cstr(|s| open_beneath_resolve_beneath(dir_fd, s, flags, mode, lookup_flags))?
+    {
+        return Ok(file);
+    }
+
     do_open_beneath(dir_fd, path.as_path(), flags, mode, lookup_flags)
 }
 
@@ -175,6 +182,141 @@ fn open_beneath_openat2(
         // renamed on the system. Fall back on the normal method if this happens.
         Err(e) if matches!(e.raw_os_error(), Some(libc::E2BIG) | Some(libc::EAGAIN)) => Ok(None),
         Err(e) => Err(e),
+    }
+}
+
+#[cfg(all(feature = "o_resolve_beneath", target_os = "freebsd"))]
+fn open_beneath_resolve_beneath(
+    dir_fd: RawFd,
+    mut path: &CStr,
+    flags: libc::c_int,
+    mode: libc::mode_t,
+    lookup_flags: LookupFlags,
+) -> io::Result<Option<fs::File>> {
+    use core::sync::atomic::{AtomicU8, Ordering};
+
+    const O_RESOLVE_BENEATH: libc::c_int = 0x00800000;
+
+    // Make sure O_RESOLVE_BENEATH is supported by the kernel
+    static O_RESOLVE_BENEATH_WORKS: AtomicU8 = AtomicU8::new(2);
+    match O_RESOLVE_BENEATH_WORKS.load(Ordering::Relaxed) {
+        // Not supported
+        0 => return Ok(None),
+        // Supported
+        1 => (),
+
+        // Check kern.osreldate to see if we're on FreeBSD 13.0+
+        _ => {
+            let mut osreldate = 0;
+            let mut oldlen = core::mem::size_of::<libc::c_int>();
+            if unsafe {
+                libc::sysctl(
+                    [libc::CTL_KERN, libc::KERN_OSRELDATE].as_ptr(),
+                    2,
+                    &mut osreldate as *mut _ as *mut _,
+                    &mut oldlen,
+                    core::ptr::null(),
+                    0,
+                )
+            } == 0
+                && osreldate >= 1300139
+            {
+                // We're on FreeBSD 13.0+, so it should work
+                O_RESOLVE_BENEATH_WORKS.store(1, Ordering::Relaxed);
+            } else {
+                O_RESOLVE_BENEATH_WORKS.store(0, Ordering::Relaxed);
+                return Ok(None);
+            }
+        }
+    }
+
+    // This returns true if resolution of ".." components is not disabled.
+    fn dotdot_allowed() -> bool {
+        let mut value: libc::c_int = 0;
+        let mut oldlen = core::mem::size_of::<libc::c_int>();
+
+        if unsafe {
+            libc::sysctlbyname(
+                b"vfs.lookup_cap_dotdot\0".as_ptr() as *const _,
+                &mut value as *mut _ as *mut _,
+                &mut oldlen,
+                core::ptr::null(),
+                0,
+            )
+        } == 0
+            && value != 0
+        {
+            oldlen = core::mem::size_of::<libc::c_int>();
+            if unsafe {
+                libc::sysctlbyname(
+                    b"vfs.lookup_cap_dotdot_nonlocal\0".as_ptr() as *const _,
+                    &mut value as *mut _ as *mut _,
+                    &mut oldlen,
+                    core::ptr::null(),
+                    0,
+                )
+            } == 0
+                && value != 0
+            {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    if dir_fd == libc::AT_FDCWD {
+        // An actual directory must be specified
+        return Err(io::Error::from_raw_os_error(libc::EBADF));
+    } else if !LookupFlags::IN_ROOT.contains(lookup_flags) {
+        // We can only handle the IN_ROOT lookup flag
+        return Ok(None);
+    }
+
+    if path.to_bytes().first() == Some(&b'/') {
+        if !lookup_flags.contains(LookupFlags::IN_ROOT) {
+            // Leading slashes are not allowed unless IN_ROOT is specified
+            return Err(io::Error::from_raw_os_error(libc::EXDEV));
+        }
+
+        // IN_ROOT was specified, so the leading slashes are OK. However, O_RESOLVE_BENEATH doesn't
+        // like leading slashes, so we need to strip them.
+        if let Some(index) = path.to_bytes().iter().position(|&c| c != b'/') {
+            // We found the index of the first non-slash character.
+            // Now ignore all the leading slashes.
+            path = &path[index..];
+        } else {
+            // No non-slashes -> the path is entirely slashes
+            // Just reopen the directory
+            return util::open_dot(dir_fd, flags, 0).map(Some);
+        }
+    }
+
+    match util::openat(dir_fd, path, flags | O_RESOLVE_BENEATH, mode) {
+        Ok(f) => Ok(Some(f)),
+        Err(e) => match e.raw_os_error() {
+            Some(libc::ENOTCAPABLE) => {
+                // O_RESOLVE_BENEATH will fail if:
+                // 1. A symlink encountered during resolution points to an absolute path.
+                // 2. The `vfs.lookup_cap_dotdot` or `vfs.lookup_cap_dotdot_nonlocal` MIBs are set
+                //    to 0 and a ".." component was encountered.
+                //
+                // We allow ".." components, so we have to fall back on the regular method in case
+                // (2). We also allow absolute paths if `IN_ROOT` is specified, so we have to fall
+                // back on the regular method if `IN_ROOT` was passed.
+
+                if lookup_flags.contains(LookupFlags::IN_ROOT) || !dotdot_allowed() {
+                    Ok(None)
+                } else {
+                    Err(io::Error::from_raw_os_error(libc::EXDEV))
+                }
+            }
+
+            // Translate EMLINK to ELOOP for compatibility
+            Some(libc::EMLINK) => Err(io::Error::from_raw_os_error(libc::ELOOP)),
+            // Pass other errors up to the caller
+            _ => Err(e),
+        },
     }
 }
 

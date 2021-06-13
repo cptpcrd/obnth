@@ -12,9 +12,9 @@ task:
     - env:
         FREEBSD_VERSION: 12.2 STABLE
         FREEBSD_IMAGE: freebsd-12-2-snap
-    # - env:
-    #     FREEBSD_VERSION: 13.0
-    #     FREEBSD_IMAGE: freebsd-13-0-snap
+    - env:
+        FREEBSD_VERSION: 13.0
+        FREEBSD_IMAGE: freebsd-13-0
 
   matrix:
     - env:
@@ -35,17 +35,30 @@ task:
     - sh rustup.sh -y --profile default --default-toolchain $TOOLCHAIN
   build_script:
     - . $HOME/.cargo/env
-    - cargo build
-  test_script:
+    - cargo build --no-default-features
+    - cargo build --no-default-features --features o_resolve_beneath
+  test_no_resolve_beneath_script:
     - . $HOME/.cargo/env
-    - cargo test
+    - cargo clean
+    - cargo test --no-default-features
     - |
-      mkdir -p coverage-build
+      mkdir -p coverage-no-o-beneath
       for f in target/debug/deps/*; do
         if [ -x "$f" ]; then
-          kcov --exclude-pattern=/.cargo,/.rustup,/usr/lib --include-path=$(pwd) --verify coverage-build/ "$f"
+          kcov --exclude-pattern=/.cargo,/.rustup,/usr/lib --include-path=$(pwd) --verify coverage-no-resolve-beneath/ "$f"
+        fi
+      done
+  test_resolve_beneath_script:
+    - . $HOME/.cargo/env
+    - cargo clean
+    - cargo test --no-default-features --features o_resolve_beneath
+    - |
+      mkdir -p coverage-resolve-beneath
+      for f in target/debug/deps/*; do
+        if [ -x "$f" ]; then
+          kcov --exclude-pattern=/.cargo,/.rustup,/usr/lib --include-path=$(pwd) --verify coverage-resolve-beneath/ "$f"
         fi
       done
   coverage_collect_upload_script:
-    - kcov --merge coverage-merged/ coverage-build/
+    - kcov --merge coverage-merged/ coverage-no-resolve-beneath/ coverage-resolve-beneath/
     - OS="$FREEBSD_IMAGE" bash <(curl -s https://codecov.io/bash) -e OS,TOOLCHAIN -n "$FREEBSD_IMAGE-$TOOLCHAIN" -Z -f coverage-merged/kcov-merged/cobertura.xml

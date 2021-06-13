@@ -12,7 +12,10 @@ keywords = ["chroot", "open", "secure"]
 repository = "https://github.com/cptpcrd/obnth"
 
 [features]
-default = ["openat2"]
+default = ["openat2", "o_resolve_beneath"]
+
+# Enable using openat(..., O_RESOLVE_BENEATH) on FreeBSD (ignored on other platforms)
+o_resolve_beneath = []
 
 # Enable using openat2() on Linux (ignored on other platforms)
 openat2 = []
