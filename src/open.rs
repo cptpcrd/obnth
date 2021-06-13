@@ -139,7 +139,7 @@ fn open_beneath_openat2(
     }
 
     // Before we go any further, make sure the current kernel supports openat2()
-    if !openat2::has_openat2_cached() {
+    if !openat2_rs::has_openat2_cached() {
         return Ok(None);
     }
 
@@ -152,23 +152,23 @@ fn open_beneath_openat2(
         _ => Cow::Borrowed(path),
     };
 
-    let mut how = openat2::OpenHow::new(flags | libc::O_NOCTTY | libc::O_CLOEXEC, mode as _);
+    let mut how = openat2_rs::OpenHow::new(flags | libc::O_NOCTTY | libc::O_CLOEXEC, mode as _);
     how.truncate_flags_mode();
 
-    how.resolve |= openat2::ResolveFlags::NO_MAGICLINKS;
+    how.resolve |= openat2_rs::ResolveFlags::NO_MAGICLINKS;
     if lookup_flags.contains(LookupFlags::IN_ROOT) {
-        how.resolve |= openat2::ResolveFlags::IN_ROOT;
+        how.resolve |= openat2_rs::ResolveFlags::IN_ROOT;
     } else {
-        how.resolve |= openat2::ResolveFlags::BENEATH;
+        how.resolve |= openat2_rs::ResolveFlags::BENEATH;
     }
     if lookup_flags.contains(LookupFlags::NO_SYMLINKS) {
-        how.resolve |= openat2::ResolveFlags::NO_SYMLINKS;
+        how.resolve |= openat2_rs::ResolveFlags::NO_SYMLINKS;
     }
     if lookup_flags.contains(LookupFlags::NO_XDEV) {
-        how.resolve |= openat2::ResolveFlags::NO_XDEV;
+        how.resolve |= openat2_rs::ResolveFlags::NO_XDEV;
     }
 
-    match openat2::openat2_cstr(Some(dir_fd), &path, &how) {
+    match openat2_rs::openat2_cstr(Some(dir_fd), &path, &how) {
         Ok(fd) => Ok(Some(unsafe { fs::File::from_raw_fd(fd) })),
         // E2BIG means an unsupported extension was specified.
         // EAGAIN is returned from openat2() with RESOLVE_BENEATH or RESOLVE_IN_ROOT if any file is
