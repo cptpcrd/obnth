@@ -42,17 +42,15 @@ fn statfs(path: &CStr) -> io::Result<libc::statfs> {
 
 fn get_mnt_id(fd: RawFd) -> io::Result<u32> {
     if let Some(mnt_id) = get_mnt_id_name_handle(fd)? {
-        return Ok(mnt_id);
+        Ok(mnt_id)
+    } else {if let Some(mnt_id) = get_mnt_id_procfs(fd)? {
+        Ok(mnt_id)
+    } else {
+        Err(io::Error::new(
+            io::ErrorKind::Other,
+            "unable to get mount ID; is /proc mounted?",
+        ))
     }
-
-    if let Some(mnt_id) = get_mnt_id_procfs(fd)? {
-        return Ok(mnt_id);
-    }
-
-    Err(io::Error::new(
-        io::ErrorKind::Other,
-        "unable to get mount ID; is /proc mounted?",
-    ))
 }
 
 fn get_mnt_id_name_handle(fd: RawFd) -> io::Result<Option<u32>> {
