@@ -43,7 +43,7 @@ fn statfs(path: &CStr) -> io::Result<libc::statfs> {
 fn get_mnt_id(fd: RawFd) -> io::Result<u32> {
     if let Some(mnt_id) = get_mnt_id_name_handle(fd)? {
         Ok(mnt_id)
-    } else {if let Some(mnt_id) = get_mnt_id_procfs(fd)? {
+    } else if let Some(mnt_id) = get_mnt_id_procfs(fd)? {
         Ok(mnt_id)
     } else {
         Err(io::Error::new(
