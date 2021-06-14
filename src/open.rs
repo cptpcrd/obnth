@@ -381,7 +381,13 @@ fn do_open_beneath(
 
         links.advance()?;
         if flags & libc::O_NOFOLLOW == libc::O_NOFOLLOW {
-            return Err(io::Error::from_raw_os_error(libc::ELOOP));
+            return Err(io::Error::from_raw_os_error(
+                if flags & libc::O_DIRECTORY == libc::O_DIRECTORY {
+                    libc::ENOTDIR
+                } else {
+                    libc::ELOOP
+                },
+            ));
         }
 
         split_link_path_into(&target, flags, parts)?;
