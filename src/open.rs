@@ -301,12 +301,7 @@ fn check_beneath(base_fd: RawFd, dir_fd_stat: &libc::stat) -> io::Result<()> {
 
         prev_stat = cur_stat;
 
-        cur_file = Some(util::openat(
-            cur_fd,
-            unsafe { CStr::from_bytes_with_nul_unchecked(b"..\0") },
-            constants::DIR_OPEN_FLAGS,
-            0,
-        )?);
+        cur_file = Some(util::open_dotdot(cur_fd, constants::DIR_OPEN_FLAGS, 0)?);
     }
 }
 
@@ -440,12 +435,7 @@ fn do_open_beneath(
                     cur_file = None;
                     saw_parent_elem = false;
                 } else {
-                    cur_file = Some(util::openat(
-                        cur_fd,
-                        unsafe { CStr::from_bytes_with_nul_unchecked(b"..\0") },
-                        flags,
-                        mode,
-                    )?);
+                    cur_file = Some(util::open_dotdot(cur_fd, flags, mode)?);
 
                     saw_parent_elem = true;
                 }
@@ -543,12 +533,7 @@ fn do_open_beneath(
     if let Some(cur_file) = cur_file {
         Ok(cur_file)
     } else {
-        util::openat(
-            dir_fd,
-            unsafe { CStr::from_bytes_with_nul_unchecked(b".\0") },
-            orig_flags,
-            mode,
-        )
+        util::open_dot(dir_fd, orig_flags, mode)
     }
 }
 

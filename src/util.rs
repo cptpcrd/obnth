@@ -267,6 +267,26 @@ pub fn renameat(
     }
 }
 
+#[inline]
+pub fn open_dot(dir_fd: RawFd, flags: libc::c_int, mode: libc::mode_t) -> io::Result<fs::File> {
+    openat(
+        dir_fd,
+        unsafe { CStr::from_bytes_with_nul_unchecked(b".\0") },
+        flags,
+        mode,
+    )
+}
+
+#[inline]
+pub fn open_dotdot(dir_fd: RawFd, flags: libc::c_int, mode: libc::mode_t) -> io::Result<fs::File> {
+    openat(
+        dir_fd,
+        unsafe { CStr::from_bytes_with_nul_unchecked(b"..\0") },
+        flags,
+        mode,
+    )
+}
+
 pub fn path_split(path: &Path) -> Option<(Option<&OsStr>, &OsStr)> {
     if path == Path::new("/") || path.ends_with("..") {
         return None;

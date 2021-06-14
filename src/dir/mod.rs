@@ -62,12 +62,7 @@ impl Dir {
 
     #[inline]
     fn reopen_raw(&self, flags: libc::c_int) -> io::Result<RawFd> {
-        util::openat_raw(
-            self.fd,
-            unsafe { CStr::from_bytes_with_nul_unchecked(b".\0") },
-            flags,
-            0,
-        )
+        util::open_dot(self.fd, flags, 0).map(|f| f.into_raw_fd())
     }
 
     /// Open the parent directory of this directory, without checking if it's open to the root
@@ -80,12 +75,8 @@ impl Dir {
     #[inline]
     pub fn parent_unchecked(&self) -> io::Result<Self> {
         Ok(Self {
-            fd: util::openat_raw(
-                self.fd,
-                &unsafe { CStr::from_bytes_with_nul_unchecked(b"..\0") },
-                constants::DIR_OPEN_FLAGS,
-                0,
-            )?,
+            fd: util::open_dotdot(self.fd, constants::DIR_OPEN_FLAGS, 0)
+                .map(|f| f.into_raw_fd())?,
         })
     }
 
