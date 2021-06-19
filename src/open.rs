@@ -354,7 +354,13 @@ fn do_open_beneath(
         // then let's skip the readlinkat() check and return ELOOP directly.
         if eno == libc::ELOOP && (flags & libc::O_NOFOLLOW == libc::O_NOFOLLOW || links.exhausted())
         {
-            return Err(io::Error::from_raw_os_error(libc::ELOOP));
+            return Err(io::Error::from_raw_os_error(
+                if flags & libc::O_DIRECTORY == libc::O_DIRECTORY && !links.exhausted() {
+                    libc::ENOTDIR
+                } else {
+                    libc::ELOOP
+                },
+            ));
         }
 
         let target = match util::readlinkat(relfd, relpath) {
