@@ -461,17 +461,25 @@ fn do_open_beneath(
 
                 match util::openat(cur_fd, &part, flags | libc::O_NOFOLLOW, mode) {
                     Ok(f) => {
-                        // On Linux, O_PATH|O_NOFOLLOW will return a file descriptor open to the *symlink*
-                        // (though adding in O_DIRECTORY will prevent this by only allowing a directory). Since
-                        // we "add in" O_NOFOLLOW, if O_PATH was specified and neither O_NOFOLLOW nor
-                        // O_DIRECTORY was, we might accidentally open a symlink when that isn't what the user
-                        // wants.
+                        // On Linux (and FreeBSD 14.0+), O_PATH|O_NOFOLLOW will return a file
+                        // descriptor open to the *symlink* (though adding in O_DIRECTORY will
+                        // prevent this by only allowing a directory). Since we "add in" O_NOFOLLOW,
+                        // if O_PATH was specified and neither O_NOFOLLOW nor O_DIRECTORY was, we
+                        // might accidentally open a symlink when that isn't what the user wants.
                         //
                         // So let's check if it's a symlink in that case.
 
                         #[cfg(any(target_os = "linux", target_os = "android"))]
-                        if flags & (libc::O_PATH | libc::O_NOFOLLOW | libc::O_DIRECTORY)
-                            == libc::O_PATH
+                        use libc::O_PATH;
+                        #[cfg(target_os = "freebsd")]
+                        const O_PATH: libc::c_int = 0x00400000;
+
+                        #[cfg(any(
+                            target_os = "linux",
+                            target_os = "android",
+                            target_os = "freebsd",
+                        ))]
+                        if flags & (O_PATH | libc::O_NOFOLLOW | libc::O_DIRECTORY) == O_PATH
                             && f.metadata()?.file_type().is_symlink()
                         {
                             // It *is* a symlink.
