@@ -1,5 +1,5 @@
 use std::collections::VecDeque;
-use std::ffi::{CStr, CString, OsStr, OsString};
+use std::ffi::{CString, OsStr, OsString};
 use std::io;
 use std::os::unix::prelude::*;
 use std::path::{Path, PathBuf};
@@ -197,6 +197,7 @@ impl Dir {
                 // On Linux, we can actually get a file descriptor to the *symlink*, then
                 // readlink() that. However, if we don't have openat2() then this costs an extra
                 // syscall, so let's only do it if the `openat2` feature is enabled.
+                use std::ffi::CStr;
 
                 let file = open_beneath(
                     self.fd,
@@ -345,6 +346,8 @@ impl Dir {
 
         #[cfg(target_os = "macos")]
         {
+            use std::ffi::CStr;
+
             let mut buf = [0u8; libc::PATH_MAX as usize];
 
             if unsafe { libc::fcntl(self.fd, libc::F_GETPATH, buf.as_mut_ptr()) } == 0 {
