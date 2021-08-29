@@ -30,7 +30,7 @@ task:
     CODECOV_TOKEN: ENCRYPTED[0535c7ad05b80db6bf8f60b0c14e94df3ca863405e40eb71458633cf05e502999cf4ea51effb7268ad49158a077e1a16]
 
   install_script:
-    - pkg install -y curl kcov bash
+    - pkg install -y npm jq curl kcov bash
     - curl -sSf https://sh.rustup.rs -o rustup.sh
     - sh rustup.sh -y --profile default --default-toolchain $TOOLCHAIN
   build_script:
@@ -44,8 +44,13 @@ task:
       for f in target/debug/deps/*; do
         if [ -x "$f" ]; then
           kcov --exclude-pattern=/.cargo,/.rustup,/usr/lib --include-path=$(pwd) --verify coverage-build/ "$f"
+          rm -f "coverage-build/${f##*/}"
         fi
       done
   coverage_collect_upload_script:
     - kcov --merge coverage-merged/ coverage-build/
-    - OS="$FREEBSD_IMAGE" bash <(curl -s https://codecov.io/bash) -e OS,TOOLCHAIN -n "$FREEBSD_IMAGE-$TOOLCHAIN" -Z -f coverage-merged/kcov-merged/cobertura.xml
+    - curl -sSfL "$(curl -sSf 'https://api.github.com/repos/codecov/uploader/releases/latest' | jq -r '.tarball_url')" -o codecov-uploader.tar.gz
+    - tar -xzf codecov-uploader.tar.gz
+    - mv codecov-uploader-*/ codecov-uploader/
+    - (cd codecov-uploader && npm install && npm run build)
+    - node codecov-uploader/dist/bin/codecov -e OS,TOOLCHAIN -n "$FREEBSD_IMAGE-$TOOLCHAIN" -Z -f coverage-merged/kcov-merged/cobertura.xml
