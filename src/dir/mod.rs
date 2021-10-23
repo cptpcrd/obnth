@@ -55,7 +55,7 @@ impl Dir {
     pub fn open<P: AsPath>(path: P) -> io::Result<Self> {
         path.with_cstr(|s| {
             Ok(Self {
-                fd: util::openat_raw(libc::AT_FDCWD, &s, constants::DIR_OPEN_FLAGS, 0)?,
+                fd: util::openat_raw(libc::AT_FDCWD, s, constants::DIR_OPEN_FLAGS, 0)?,
             })
         })
     }

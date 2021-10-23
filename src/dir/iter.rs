@@ -108,7 +108,7 @@ impl Iterator for ReadDirIter {
                     0 => None,
                     eno => Some(Err(io::Error::from_raw_os_error(eno))),
                 };
-            } else if let Some(entry) = unsafe { Entry::from_raw(&self, raw_entry) } {
+            } else if let Some(entry) = unsafe { Entry::from_raw(self, raw_entry) } {
                 return Some(Ok(entry));
             }
         }

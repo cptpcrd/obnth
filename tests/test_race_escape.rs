@@ -31,7 +31,7 @@ fn check_beneath(base_file: &fs::File, dir_fd_meta: &fs::Metadata) -> io::Result
             // We found it! We *didn't* escape.
             return Ok(());
         } else if let Some(prev_meta) = prev_meta.as_ref() {
-            if same_meta(&cur_meta, &prev_meta) {
+            if same_meta(&cur_meta, prev_meta) {
                 // Trying to open ".." brought us the same directory. That means we're at "/"
                 // (the REAL "/").
                 // So we escaped the "beneath" directory.

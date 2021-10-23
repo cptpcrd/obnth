@@ -348,7 +348,7 @@ mod tests {
     fn test_ebadf_errors() {
         assert_eq!(fstat(-1).unwrap_err().raw_os_error(), Some(libc::EBADF));
         assert_eq!(
-            fstatat(-1, &CStr::from_bytes_with_nul(b"dir\0").unwrap(), 0)
+            fstatat(-1, CStr::from_bytes_with_nul(b"dir\0").unwrap(), 0)
                 .unwrap_err()
                 .raw_os_error(),
             Some(libc::EBADF)
