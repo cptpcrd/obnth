@@ -122,6 +122,18 @@ pub fn open_beneath<P: AsPath>(
         return Ok(file);
     }
 
+    // On macOS, if the O_NOFOLLOW_ANY flag is included, translate that to NO_SYMLINKS
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    let (flags, lookup_flags) = if flags & crate::sys::O_NOFOLLOW_ANY == crate::sys::O_NOFOLLOW_ANY
+    {
+        (
+            flags & !crate::sys::O_NOFOLLOW_ANY,
+            lookup_flags | LookupFlags::NO_SYMLINKS,
+        )
+    } else {
+        (flags, lookup_flags)
+    };
+
     do_open_beneath(dir_fd, path.as_path(), flags, mode, lookup_flags)
 }
 
