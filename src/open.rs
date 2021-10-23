@@ -134,6 +134,13 @@ pub fn open_beneath<P: AsPath>(
         (flags, lookup_flags)
     };
 
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    if let Some(file) =
+        path.with_cstr(|s| open_beneath_nofollow_any(dir_fd, s, flags, mode, lookup_flags))?
+    {
+        return Ok(file);
+    }
+
     do_open_beneath(dir_fd, path.as_path(), flags, mode, lookup_flags)
 }
 
@@ -188,6 +195,78 @@ fn open_beneath_openat2(
         Err(e) if matches!(e.raw_os_error(), Some(libc::E2BIG) | Some(libc::EAGAIN)) => Ok(None),
         Err(e) => Err(e),
     }
+}
+
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+fn open_beneath_nofollow_any(
+    dir_fd: RawFd,
+    mut path: &CStr,
+    flags: libc::c_int,
+    mode: libc::mode_t,
+    lookup_flags: LookupFlags,
+) -> io::Result<Option<fs::File>> {
+    // We can only handle NO_SYMLINKS (possibly together with IN_ROOT)
+    if lookup_flags & !LookupFlags::IN_ROOT != LookupFlags::NO_SYMLINKS {
+        return Ok(None);
+    }
+
+    // We cannot handle any ".." components
+    if path
+        .to_bytes()
+        .split(|&c| c == b'/')
+        .any(|part| part == b"..")
+    {
+        return Ok(None);
+    }
+
+    use std::sync::atomic::{AtomicU8, Ordering};
+    static HAS_NOFOLLOW_ANY: AtomicU8 = AtomicU8::new(2);
+    match HAS_NOFOLLOW_ANY.load(Ordering::Relaxed) {
+        0 => return Ok(None),
+        1 => (),
+
+        _ => {
+            // Trying to open() a file with both O_NOFOLLOW_ANY *and* O_NOFOLLOW should fail with
+            // EINVAL
+            if matches!(
+                util::openat(
+                    libc::AT_FDCWD,
+                    unsafe { CStr::from_bytes_with_nul_unchecked(b".\0") },
+                    crate::sys::O_NOFOLLOW_ANY | libc::O_NOFOLLOW | libc::O_RDONLY,
+                    0,
+                ),
+                Err(e) if e.raw_os_error() == Some(libc::EINVAL),
+            ) {
+                // Supported
+                HAS_NOFOLLOW_ANY.store(1, Ordering::Relaxed);
+            } else {
+                // Not supported
+                HAS_NOFOLLOW_ANY.store(0, Ordering::Relaxed);
+                return Ok(None);
+            }
+        }
+    }
+
+    if path.to_bytes().first() == Some(&b'/') {
+        if !lookup_flags.contains(LookupFlags::IN_ROOT) {
+            // Leading slashes are not allowed unless IN_ROOT is specified
+            return Err(io::Error::from_raw_os_error(libc::EXDEV));
+        }
+
+        // IN_ROOT was specified, so the leading slashes are OK. However, O_NOFOLLOW_ANY doesn't
+        // handle leading slashes the way we do, so we need to strip them.
+        if let Some(index) = path.to_bytes().iter().position(|&c| c != b'/') {
+            // We found the index of the first non-slash character.
+            // Now ignore all the leading slashes.
+            path = &path[index..];
+        } else {
+            // No non-slashes -> the path is entirely slashes
+            // Just reopen the directory
+            return util::open_dot(dir_fd, flags, 0).map(Some);
+        }
+    }
+
+    util::openat(dir_fd, path, flags | crate::sys::O_NOFOLLOW_ANY, mode).map(Some)
 }
 
 fn map_component_cstring(component: Component) -> io::Result<Cow<CStr>> {
