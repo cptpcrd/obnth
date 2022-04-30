@@ -88,6 +88,7 @@ fn test_race_escape() {
 
     for path in &[
         CString::new("b/..").unwrap(),
+        CString::new("b/../b/..").unwrap(),
         CString::new(
             Path::new("b/../../")
                 .join(tmpdir.file_name().unwrap())
