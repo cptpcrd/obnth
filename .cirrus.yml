@@ -10,11 +10,8 @@ task:
         FREEBSD_VERSION: 12.2
         FREEBSD_IMAGE: freebsd-12-2
     - env:
-        FREEBSD_VERSION: 12.2 STABLE
-        FREEBSD_IMAGE: freebsd-12-2-snap
-    # - env:
-    #     FREEBSD_VERSION: 13.0
-    #     FREEBSD_IMAGE: freebsd-13-0-snap
+        FREEBSD_VERSION: 13.0
+        FREEBSD_IMAGE: freebsd-13-0
 
   matrix:
     - env:
@@ -30,7 +27,7 @@ task:
     CODECOV_TOKEN: ENCRYPTED[0535c7ad05b80db6bf8f60b0c14e94df3ca863405e40eb71458633cf05e502999cf4ea51effb7268ad49158a077e1a16]
 
   install_script:
-    - pkg install -y npm jq curl kcov bash
+    - pkg install -y npm jq curl kcov bash git
     - curl -sSf https://sh.rustup.rs -o rustup.sh
     - sh rustup.sh -y --profile default --default-toolchain $TOOLCHAIN
   build_script:
@@ -49,8 +46,6 @@ task:
       done
   coverage_collect_upload_script:
     - kcov --merge coverage-merged/ coverage-build/
-    - curl -sSfL "$(curl -sSf 'https://api.github.com/repos/codecov/uploader/releases/latest' | jq -r '.tarball_url')" -o codecov-uploader.tar.gz
-    - tar -xzf codecov-uploader.tar.gz
-    - mv codecov-uploader-*/ codecov-uploader/
+    - git clone https://github.com/codecov/uploader.git codecov-uploader -b "$(curl -sSf 'https://api.github.com/repos/codecov/uploader/releases/latest' | jq -r '.tag_name')"
     - (cd codecov-uploader && npm install && npm run build)
     - node codecov-uploader/dist/bin/codecov -e OS,TOOLCHAIN -n "$FREEBSD_IMAGE-$TOOLCHAIN" -Z -f coverage-merged/kcov-merged/cobertura.xml
